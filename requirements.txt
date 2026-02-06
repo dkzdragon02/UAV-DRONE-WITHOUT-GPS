@@ -1,0 +1,82 @@
+# Core dependencies
+numpy>=1.24.0,<2.0.0
+opencv-python>=4.8.0
+opencv-contrib-python>=4.8.0
+scipy>=1.10.0
+pyserial>=3.5
+pyyaml>=6.0
+# tf-transformations is not available on PyPI - using custom implementations or transforms3d
+# transforms3d>=0.4.1  # Alternative: pip install transforms3d if needed
+
+# MAVLink và Flight Controller
+pymavlink>=2.4.37
+dronekit>=2.9.2
+
+# Camera
+picamera2>=0.3.12
+
+# IMU
+adafruit-circuitpython-mpu6050>=2.2.0
+adafruit-circuitpython-bno055>=2.0.0
+
+# Sensor Fusion
+filterpy>=1.4.5
+
+# Visualization
+matplotlib>=3.7.0
+
+# Performance Monitoring (optional)
+psutil>=5.9.0
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.10.0
+
+# Code Quality
+black>=23.0.0
+pylint>=2.17.0
+flake8>=6.0.0
+mypy>=1.0.0
+isort>=5.12.0
+
+# ROS2 (sẽ cài qua apt, nhưng có thể dùng pip cho một số packages)
+# rclpy>=3.3.0  # Cài qua apt: ros-humble-rclpy
+# sensor-msgs  # Cài qua apt: ros-humble-sensor-msgs
+# geometry-msgs  # Cài qua apt: ros-humble-geometry-msgs
+# mavros-msgs  # Cài qua apt: ros-humble-mavros-msgs
+# visualization-msgs  # Cài qua apt: ros-humble-visualization-msgs
+# diagnostic-msgs  # Cài qua apt: ros-humble-diagnostic-msgs
+
+# SLAM và Vision (optional, cần build từ source)
+# ORB-SLAM3: https://github.com/UZ-SLAMLab/ORB_SLAM3
+# OpenVINS: https://github.com/rpng/open_vins
+
+
+
+
+deactivate
+
+
+
+
+cd ~/PX4-Autopilot
+make px4_sitl gazebo
+
+sudo socat TCP4-LISTEN:5760,bind=0.0.0.0,reuseaddr,fork UDP4:127.0.0.1:18570
+
+cd ~/UAV-no-GPS
+source .venv/bin/activate
+cd ros2_ws
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch uav_vision px4_ros2_only.launch.py px4_connection:=udp:127.0.0.1:14280
+
+cd ~/UAV-no-GPS
+source .venv/bin/activate
+cd ros2_ws
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+
+ros2 run uav_vision obstacle_avoidance_node \ --ros-args -p odom_topic:=/uav/vision/odometry -p scan_topic:=/scan \ -p goal_x:=5.0 -p goal_y:=0.0 -p max_velocity:=1.0
+

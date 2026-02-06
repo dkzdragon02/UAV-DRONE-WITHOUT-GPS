@@ -1,0 +1,72 @@
+# Example Configuration File cho UAV Vision System
+
+# Camera Parameters
+camera:
+  width: 640
+  height: 480
+  fps: 30
+  calibration_file: "data/calib_results/camera.yaml"
+
+# Visual Odometry
+visual_odometry:
+  feature_detector: "ORB"  # ORB, SIFT, SURF
+  max_features: 500
+  min_match_count: 10
+  scale_factor: 1.0
+
+# SLAM
+slam:
+  map_resolution: 0.1  # meters per pixel
+  map_width: 200  # pixels
+  map_height: 200  # pixels
+  loop_closure_threshold: 0.5  # meters
+  loop_closure_min_distance: 5.0  # meters
+  use_graph_optimization: true
+  optimization_interval: 10
+
+# State Machine
+state_machine:
+  target_altitude: 2.0  # meters
+  takeoff_timeout: 30.0  # seconds
+  landing_timeout: 30.0  # seconds
+  emergency_landing_altitude: 0.5  # meters
+
+# Path Planning
+path_planner:
+  waypoint_tolerance: 0.5  # meters
+  path_resolution: 0.1  # meters
+  obstacle_inflation: 0.3  # meters
+
+# PX4 Controller
+px4_controller:
+  max_velocity: 1.0  # m/s
+  waypoint_tolerance: 0.5  # meters
+  lookahead_distance: 1.0  # meters
+
+# Obstacle Avoidance
+obstacle_avoidance:
+  repulsive_gain: 1.0
+  attractive_gain: 1.0
+  safety_distance: 0.5  # meters
+  max_repulsive_distance: 2.0  # meters
+
+# Coverage Planning
+coverage_planner:
+  default_spacing: 1.0  # meters
+  default_altitude: 2.0  # meters
+
+# PX4 Connection
+px4:
+  connection: "udp:127.0.0.1:14540"
+  send_rate: 30.0  # Hz
+
+# Performance
+performance:
+  monitor_enabled: true
+  update_rate: 1.0  # Hz
+
+# Evaluation
+evaluation:
+  report_interval: 10.0  # seconds
+  enable_metrics: true
+

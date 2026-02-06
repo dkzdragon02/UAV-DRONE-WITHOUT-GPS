@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  uav-vision:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: uav-vision
+    image: uav-vision:latest
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./ros2_ws:/workspace/ros2_ws
+      - ./logs:/workspace/logs
+      - ./config:/workspace/config
+    network_mode: host
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ros2", "node", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: Add monitoring service
+  # prometheus:
+  #   image: prom/prometheus:latest
+  #   container_name: prometheus
+  #   volumes:
+  #     - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+  #   ports:
+  #     - "9090:9090"
+

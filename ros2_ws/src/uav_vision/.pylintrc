@@ -1,0 +1,62 @@
+[MASTER]
+# Python code to execute, usually for sys.path manipulation
+init-hook='import sys; sys.path.insert(0, "ros2_ws/src/uav_vision")'
+
+# Files or directories to be skipped
+ignore=build,install,test
+
+# Pickle collected data for later comparisons
+persistent=yes
+
+[MESSAGES CONTROL]
+# Disable specific warnings
+disable=
+    missing-docstring,
+    too-few-public-methods,
+    too-many-arguments,
+    too-many-instance-attributes,
+    too-many-locals,
+    import-error,
+    no-member,
+    too-many-branches,
+    too-many-statements
+
+[FORMAT]
+# Maximum number of characters on a single line
+max-line-length=100
+
+# Regexp for a line that is allowed to be longer than the limit
+ignore-long-lines=^\s*(#|import|from)
+
+[BASIC]
+# Good variable names
+good-names=i,j,k,ex,Run,_,qx,qy,qz,qw
+
+[DESIGN]
+# Maximum number of arguments for function / method
+max-args=7
+
+# Maximum number of attributes for a class
+max-attributes=15
+
+# Maximum number of boolean expressions in an if statement
+max-bool-expr=5
+
+# Maximum number of branch for function / method body
+max-branches=15
+
+# Maximum number of locals for function / method body
+max-locals=20
+
+# Maximum number of parents for a class
+max-parents=7
+
+# Maximum number of public methods for a class
+max-public-methods=25
+
+# Maximum number of return / yield for function / method body
+max-returns=10
+
+# Maximum number of statements in function / method body
+max-statements=60
+

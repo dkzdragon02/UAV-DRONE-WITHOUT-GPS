@@ -1,0 +1,127 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    
+    strategy:
+      matrix:
+        python-version: ["3.10"]
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          python3-pip \
+          python3-opencv \
+          python3-numpy \
+          python3-yaml
+    
+    - name: Install ROS2 Humble
+      run: |
+        sudo apt install -y software-properties-common
+        sudo add-apt-repository universe
+        sudo apt update && sudo apt install -y curl gnupg lsb-release
+        curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key | sudo apt-key add -
+        sudo sh -c 'echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" > /etc/apt/sources.list.d/ros2-latest.list'
+        sudo apt update
+        sudo apt install -y ros-humble-desktop python3-rosdep
+        sudo rosdep init || true
+        rosdep update
+    
+    - name: Install Python dependencies
+      run: |
+        cd ${{ github.workspace }}
+        pip3 install --upgrade pip
+        pip3 install -r requirements.txt
+    
+    - name: Setup ROS2 environment
+      run: |
+        source /opt/ros/humble/setup.bash
+        echo "source /opt/ros/humble/setup.bash" >> $GITHUB_ENV
+    
+    - name: Run tests
+      run: |
+        cd ${{ github.workspace }}/ros2_ws/src/uav_vision
+        source /opt/ros/humble/setup.bash
+        python3 -m pytest test/ -v --cov=uav_vision --cov-report=xml --cov-report=term
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./ros2_ws/src/uav_vision/coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+
+  lint:
+    runs-on: ubuntu-22.04
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+    
+    - name: Install dependencies
+      run: |
+        pip3 install --upgrade pip
+        pip3 install black pylint flake8 mypy isort
+    
+    - name: Run black check
+      run: |
+        cd ${{ github.workspace }}/ros2_ws/src/uav_vision
+        black --check --line-length=100 .
+    
+    - name: Run isort check
+      run: |
+        cd ${{ github.workspace }}/ros2_ws/src/uav_vision
+        isort --check-only --profile=black .
+    
+    - name: Run flake8
+      run: |
+        cd ${{ github.workspace }}/ros2_ws/src/uav_vision
+        flake8 --max-line-length=100 --extend-ignore=E203,W503 uav_vision/
+    
+    - name: Run pylint
+      run: |
+        cd ${{ github.workspace }}/ros2_ws/src/uav_vision
+        pylint uav_vision/ --rcfile=.pylintrc || true
+
+  build:
+    runs-on: ubuntu-22.04
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install ROS2 Humble
+      run: |
+        sudo apt install -y software-properties-common
+        sudo add-apt-repository universe
+        sudo apt update && sudo apt install -y curl gnupg lsb-release
+        curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key | sudo apt-key add -
+        sudo sh -c 'echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" > /etc/apt/sources.list.d/ros2-latest.list'
+        sudo apt update
+        sudo apt install -y ros-humble-desktop python3-colcon-common-extensions
+    
+    - name: Build ROS2 workspace
+      run: |
+        cd ${{ github.workspace }}/ros2_ws
+        source /opt/ros/humble/setup.bash
+        colcon build --packages-select uav_vision
+
