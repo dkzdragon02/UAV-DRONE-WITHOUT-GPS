@@ -34,6 +34,11 @@ install(PROGRAMS
   scripts/visualization_node
   scripts/px4_mavros_offboard_bridge
   scripts/dummy_vision_pose
+  scripts/px4_param_setup
+  scripts/flight_command_panel
+  scripts/ekf_fusion
+  scripts/mission_map_node
+  scripts/matlab_udp_bridge
   DESTINATION lib/${PROJECT_NAME}
 )
 

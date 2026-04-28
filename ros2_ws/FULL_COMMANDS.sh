@@ -1,12 +1,14 @@
 #!/bin/bash
 # ============================================
 # HƯỚNG DẪN CHẠY UAV TRONG GAZEBO
+# (Vision-based, No GPS)
 # ============================================
 # Chạy từng terminal theo thứ tự dưới đây
 # ============================================
 
 echo "============================================"
 echo "HƯỚNG DẪN CHẠY UAV - 6 TERMINALS"
+echo "(Vision-based OFFBOARD, No GPS)"
 echo "============================================"
 echo ""
 echo "MỞ 6 TERMINALS RIÊNG BIỆT và chạy từng lệnh:"
@@ -15,11 +17,32 @@ echo ""
 cat << 'EOF'
 
 ╔══════════════════════════════════════════════════════════════╗
-║  TERMINAL 1 - PX4 SITL + GAZEBO                             ║
+║  TERMINAL 1 - PX4 SITL + GAZEBO (iris_vision - KHÔNG GPS)    ║
 ╚══════════════════════════════════════════════════════════════╝
 
 cd ~/PX4-Autopilot
-make px4_sitl gazebo
+make px4_sitl gazebo-classic_iris_vision
+
+# QUAN TRỌNG: Phải dùng gazebo-classic_iris_vision (KHÔNG PHẢI iris!)
+# iris_vision tự động cấu hình:
+#   - EKF2_EV_CTRL = 15 (External Vision)
+#   - EKF2_HGT_REF = 3  (Vision height)
+#   - EKF2_GPS_CTRL = 0  (Tắt GPS)
+
+# SAU KHI PX4 KHỞI ĐỘNG, paste các lệnh sau vào pxh> console:
+#
+#   param set COM_LOW_BAT_ACT 0
+#   param set NAV_RCL_ACT 0
+#   param set COM_RCL_EXCEPT 4
+#   param set NAV_DLL_ACT 0
+#   param set GF_ACTION 0
+#   param set COM_DISARM_PRFLT -1
+#   param set COM_OF_LOSS_T 5.0
+#   param set BAT_LOW_THR 0.05
+#   param set BAT_CRIT_THR 0.03
+#   param set BAT_EMERGEN_THR 0.01
+#
+# Hoặc chạy node tự động (Terminal 3b bên dưới)
 
 # GIỮ NGUYÊN TERMINAL NÀY
 
@@ -28,7 +51,7 @@ make px4_sitl gazebo
 ║  TERMINAL 2 - MAVROS                                         ║
 ╚══════════════════════════════════════════════════════════════╝
 
-cd /home/dkzdragon02/UAV-no-GPS/ros2_ws
+cd ~/VUAV-DRONE-WITHOUT-GPS/ros2_ws
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 
@@ -41,10 +64,10 @@ tgt_system:=1 tgt_component:=1
 
 
 ╔══════════════════════════════════════════════════════════════╗
-║  TERMINAL 3 - DUMMY VISION POSE (QUAN TRỌNG!)               ║
+║  TERMINAL 3 - DUMMY VISION POSE (QUAN TRỌNG!)                ║
 ╚══════════════════════════════════════════════════════════════╝
 
-cd /home/dkzdragon02/UAV-no-GPS/ros2_ws
+cd ~/VUAV-DRONE-WITHOUT-GPS/ros2_ws
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 
@@ -54,30 +77,42 @@ ros2 run uav_vision dummy_vision_pose
 
 
 ╔══════════════════════════════════════════════════════════════╗
-║  TERMINAL 4 - SETPOINT VẬN TỐC (0,0,0)                      ║
+║  TERMINAL 3b - TỰ ĐỘNG SET PX4 PARAMS (Tùy chọn)             ║
 ╚══════════════════════════════════════════════════════════════╝
-# QUAN TRỌNG: Chạy lệnh này TRƯỚC khi ARM!
+# Thay cho việc paste params thủ công trong Terminal 1
+# Node này tự động set tất cả params qua MAVROS
 
-cd /home/dkzdragon02/UAV-no-GPS/ros2_ws
+cd ~/VUAV-DRONE-WITHOUT-GPS/ros2_ws
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 
-# CÁCH 1: Dùng file YAML (KHUYẾN NGHỊ)
-ros2 topic pub -r 20 /mavros/setpoint_velocity/cmd_vel geometry_msgs/msg/TwistStamped --file setpoint_zero.yaml
+ros2 run uav_vision px4_param_setup
 
-# HOẶC CÁCH 2: Dùng lệnh trực tiếp
-# ros2 topic pub -r 20 /mavros/setpoint_velocity/cmd_vel geometry_msgs/msg/TwistStamped "{header: {frame_id: 'map'}, twist: {linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}}"
+# Node sẽ tự tắt sau khi set xong params
+# Đợi thấy "PX4 Param Setup complete!" rồi chuyển sang Terminal 4
+
+
+╔══════════════════════════════════════════════════════════════╗
+║  TERMINAL 4 - SETPOINT VẬN TỐC (0,0,0)                       ║
+╚══════════════════════════════════════════════════════════════╝
+# QUAN TRỌNG: Chạy lệnh này TRƯỚC khi ARM!
+
+cd ~/VUAV-DRONE-WITHOUT-GPS/ros2_ws
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+
+ros2 topic pub -r 20 /mavros/setpoint_velocity/cmd_vel geometry_msgs/msg/TwistStamped "{header: {frame_id: 'map'}, twist: {linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}}"
 
 # GIỮ NGUYÊN LỆNH NÀY ĐANG CHẠY (đừng Ctrl+C)
 # Đợi 5-10 giây trước khi chuyển sang TERMINAL 5
 
 
 ╔══════════════════════════════════════════════════════════════╗
-║  TERMINAL 5 - ARM + OFFBOARD                                ║
+║  TERMINAL 5 - ARM + OFFBOARD                                 ║
 ╚══════════════════════════════════════════════════════════════╝
 # CHỈ CHẠY SAU KHI TERMINAL 4 ĐÃ CHẠY 5-10 GIÂY!
 
-cd /home/dkzdragon02/UAV-no-GPS/ros2_ws
+cd ~/VUAV-DRONE-WITHOUT-GPS/ros2_ws
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 
@@ -99,24 +134,20 @@ ros2 topic echo /mavros/state
 # KỲ VỌNG:
 # - connected: true
 # - armed: true
-# - mode: OFFBOARD (KHÔNG phải AUTO.LOITER!)
+# - mode: OFFBOARD (KHÔNG phải AUTO.LOITER hay AUTO.RTL!)
 
 
 ╔══════════════════════════════════════════════════════════════╗
-║  TERMINAL 6 - BAY LÊN                                       ║
+║  TERMINAL 6 - BAY LÊN                                        ║
 ╚══════════════════════════════════════════════════════════════╝
 # CHỈ CHẠY KHI ĐÃ ARM + OFFBOARD THÀNH CÔNG!
 # Dừng TERMINAL 4 (Ctrl+C) trước khi chạy lệnh này
 
-cd /home/dkzdragon02/UAV-no-GPS/ros2_ws
+cd ~/VUAV-DRONE-WITHOUT-GPS/ros2_ws
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 
-# CÁCH 1: Dùng file YAML (KHUYẾN NGHỊ)
-ros2 topic pub -r 20 /mavros/setpoint_velocity/cmd_vel geometry_msgs/msg/TwistStamped --file setpoint_up.yaml
-
-# HOẶC CÁCH 2: Dùng lệnh trực tiếp
-# ros2 topic pub -r 20 /mavros/setpoint_velocity/cmd_vel geometry_msgs/msg/TwistStamped "{header: {frame_id: 'map'}, twist: {linear: {x: 0.0, y: 0.0, z: 1.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}}"
+ros2 topic pub -r 20 /mavros/setpoint_velocity/cmd_vel geometry_msgs/msg/TwistStamped "{header: {frame_id: 'map'}, twist: {linear: {x: 0.0, y: 0.0, z: 1.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}}"
 
 # UAV sẽ bay lên với vận tốc 1 m/s theo trục Z
 # Muốn dừng: Ctrl+C, rồi chạy lại với z: 0.0
@@ -137,4 +168,18 @@ echo ""
 echo "Kiểm tra trạng thái:"
 echo "  ros2 topic echo /mavros/state"
 echo ""
-
+echo "Kiểm tra PX4 params (trong pxh>):"
+echo "  param show EKF2_EV_CTRL     # Phải = 15"
+echo "  param show EKF2_GPS_CTRL    # Phải = 0"
+echo "  param show COM_LOW_BAT_ACT  # Phải = 0"
+echo ""
+echo "============================================"
+echo "TROUBLESHOOTING"
+echo "============================================"
+echo ""
+echo "Nếu vẫn bị failsafe:"
+echo "  1. Kiểm tra dùng đúng model: gazebo-classic_iris_vision"
+echo "  2. Kiểm tra dummy_vision_pose đang chạy"
+echo "  3. Kiểm tra params đã set đúng (COM_LOW_BAT_ACT = 0)"
+echo "  4. Thử xóa params cũ: rm ~/PX4-Autopilot/build/px4_sitl_default/tmp/rootfs/parameters.bson"
+echo ""

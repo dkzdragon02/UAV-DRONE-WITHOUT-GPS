@@ -1,9 +1,3 @@
-#!/usr/bin/env python3
-"""
-Performance Profiler
-Provides profiling tools for performance analysis
-"""
-
 import cProfile
 import pstats
 import io
@@ -14,10 +8,8 @@ from dataclasses import dataclass, field
 from collections import defaultdict
 import statistics
 
-
 @dataclass
 class ProfileStats:
-    """Profile statistics"""
     function_name: str
     call_count: int
     total_time: float
@@ -26,64 +18,37 @@ class ProfileStats:
     file_name: str
     line_number: int
 
-
-class Profiler:
-    """
-    Performance profiler for code analysis.
-    
-    Provides:
-    - Function-level profiling
-    - Call count tracking
-    - Timing statistics
-    - Hotspot identification
-    """
-    
+class Profiler:   
     def __init__(self):
-        """Initialize profiler"""
         self.profiler = cProfile.Profile()
         self.enabled = False
         self.stats: List[ProfileStats] = []
     
     def start(self):
-        """Start profiling"""
         self.profiler.enable()
         self.enabled = True
     
     def stop(self):
-        """Stop profiling"""
         self.profiler.disable()
         self.enabled = False
     
     def reset(self):
-        """Reset profiler"""
         self.profiler = cProfile.Profile()
         self.stats = []
     
     def get_stats(self, sort_by: str = 'cumulative', limit: int = 20) -> List[ProfileStats]:
-        """
-        Get profiling statistics.
-        
-        Args:
-            sort_by: Sort key ('cumulative', 'time', 'calls')
-            limit: Maximum number of results
-            
-        Returns:
-            List of profile statistics
-        """
-        if not self.enabled:
+        try:
+            stream = io.StringIO()
+            stats = pstats.Stats(self.profiler, stream=stream)
+            stats.sort_stats(sort_by)
+            stats.print_stats(limit)
+        except TypeError:
             return []
         
-        stream = io.StringIO()
-        stats = pstats.Stats(self.profiler, stream=stream)
-        stats.sort_stats(sort_by)
-        stats.print_stats(limit)
-        
-        # Parse stats (simplified - in production, use pstats properly)
         self.stats = self._parse_stats(stats)
         return self.stats[:limit]
     
     def _parse_stats(self, stats: pstats.Stats) -> List[ProfileStats]:
-        """Parse pstats into ProfileStats objects"""
         result = []
         
         for func, (cc, nc, tt, ct, callers) in stats.stats.items():
@@ -103,15 +68,6 @@ class Profiler:
         return result
     
     def get_hotspots(self, threshold: float = 0.1) -> List[ProfileStats]:
-        """
-        Get performance hotspots (functions taking > threshold of total time).
-        
-        Args:
-            threshold: Time threshold (0.0 to 1.0)
-            
-        Returns:
-            List of hotspot functions
-        """
         stats = self.get_stats()
         if not stats:
             return []
@@ -122,12 +78,6 @@ class Profiler:
         return [s for s in stats if s.cumulative_time >= threshold_time]
     
     def save_stats(self, filename: str):
-        """
-        Save profiling statistics to file.
-        
-        Args:
-            filename: Output filename
-        """
         if not self.enabled:
             return
         
@@ -135,22 +85,11 @@ class Profiler:
         stats.dump_stats(filename)
     
     def load_stats(self, filename: str):
-        """
-        Load profiling statistics from file.
-        
-        Args:
-            filename: Input filename
-        """
         self.profiler = cProfile.Profile()
         self.profiler.load_stats(filename)
 
 
 class FunctionProfiler:
-    """
-    Decorator-based function profiler.
-    Tracks execution time and call counts for individual functions.
-    """
-    
     _registry: Dict[str, Dict] = defaultdict(lambda: {
         'call_count': 0,
         'total_time': 0.0,
@@ -160,13 +99,11 @@ class FunctionProfiler:
     })
     
     def __init__(self, func: Callable):
-        """Initialize function profiler"""
         self.func = func
         self.func_name = f"{func.__module__}.{func.__name__}"
         wraps(func)(self)
     
     def __call__(self, *args, **kwargs):
-        """Profile function execution"""
         start_time = time.perf_counter()
         try:
             result = self.func(*args, **kwargs)
@@ -183,27 +120,12 @@ class FunctionProfiler:
     
     @classmethod
     def get_stats(cls, func_name: Optional[str] = None) -> Dict:
-        """
-        Get profiling statistics.
-        
-        Args:
-            func_name: Function name (None for all)
-            
-        Returns:
-            Statistics dictionary
-        """
         if func_name:
             return cls._registry.get(func_name, {})
         return dict(cls._registry)
     
     @classmethod
     def get_summary(cls) -> Dict[str, Dict]:
-        """
-        Get summary statistics for all profiled functions.
-        
-        Returns:
-            Dictionary with statistics
-        """
         summary = {}
         for func_name, stats in cls._registry.items():
             times = stats['times']
@@ -220,35 +142,13 @@ class FunctionProfiler:
     
     @classmethod
     def reset(cls):
-        """Reset all profiling data"""
         cls._registry.clear()
 
-
 def profile_function(func: Callable) -> Callable:
-    """
-    Decorator to profile a function.
-    
-    Usage:
-        @profile_function
-        def my_function():
-            pass
-    """
     return FunctionProfiler(func)
 
-
 class PerformanceBenchmark:
-    """
-    Performance benchmarking tool.
-    Runs functions multiple times and collects statistics.
-    """
-    
     def __init__(self, warmup_iterations: int = 3):
-        """
-        Initialize benchmark.
-        
-        Args:
-            warmup_iterations: Number of warmup iterations
-        """
         self.warmup_iterations = warmup_iterations
         self.results: Dict[str, List[float]] = {}
     
@@ -260,23 +160,8 @@ class PerformanceBenchmark:
         *args,
         **kwargs
     ) -> Dict[str, float]:
-        """
-        Benchmark a function.
-        
-        Args:
-            func: Function to benchmark
-            name: Benchmark name
-            iterations: Number of iterations
-            *args, **kwargs: Function arguments
-            
-        Returns:
-            Statistics dictionary
-        """
-        # Warmup
         for _ in range(self.warmup_iterations):
             func(*args, **kwargs)
-        
-        # Benchmark
         times = []
         for _ in range(iterations):
             start = time.perf_counter()
@@ -299,15 +184,6 @@ class PerformanceBenchmark:
         }
     
     def compare(self, *benchmark_names: str) -> Dict:
-        """
-        Compare multiple benchmarks.
-        
-        Args:
-            *benchmark_names: Names of benchmarks to compare
-            
-        Returns:
-            Comparison dictionary
-        """
         comparison = {}
         for name in benchmark_names:
             if name in self.results:
@@ -321,10 +197,8 @@ class PerformanceBenchmark:
         return comparison
     
     def get_results(self) -> Dict[str, List[float]]:
-        """Get all benchmark results"""
         return self.results.copy()
     
     def reset(self):
-        """Reset all results"""
         self.results.clear()
 

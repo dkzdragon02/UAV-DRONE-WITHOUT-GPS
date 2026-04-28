@@ -5,20 +5,13 @@ from launch.substitutions import LaunchConfiguration, TextSubstitution
 from launch_ros.actions import Node
 import os
 
-
 def generate_launch_description():
-    """Launch file để tích hợp PX4 SITL, Gazebo và Vision System (ROS2-only)"""
-    
-    # Paths
     px4_autopilot_dir = os.path.expanduser('~/PX4-Autopilot')
-    
-    # Launch arguments
     world = LaunchConfiguration('world')
     model = LaunchConfiguration('model')
     use_gazebo = LaunchConfiguration('use_gazebo')
     
     return LaunchDescription([
-        # Launch arguments
         DeclareLaunchArgument(
             'world',
             default_value='empty',
@@ -50,7 +43,6 @@ def generate_launch_description():
             description='Use mock lidar publisher (when real lidar is not available)'
         ),
         
-        # PX4 SITL
         ExecuteProcess(
             cmd=[
                 'bash', '-c',
@@ -67,7 +59,6 @@ def generate_launch_description():
             condition=IfCondition(use_gazebo)
         ),
         
-        # PX4 MAVLink Bridge (ROS2-only, kết nối trực tiếp với PX4)
         Node(
             package='uav_vision',
             executable='px4_mavlink_bridge',
@@ -81,7 +72,6 @@ def generate_launch_description():
             condition=IfCondition(LaunchConfiguration('use_vision'))
         ),
         
-        # Vision Node
         Node(
             package='uav_vision',
             executable='vision_node',
@@ -98,7 +88,6 @@ def generate_launch_description():
             condition=IfCondition(LaunchConfiguration('use_vision'))
         ),
         
-        # Optical Flow Node
         Node(
             package='uav_vision',
             executable='optical_flow_node',
@@ -107,7 +96,6 @@ def generate_launch_description():
             condition=IfCondition(LaunchConfiguration('use_vision'))
         ),
         
-        # Obstacle Avoidance Node
         Node(
             package='uav_vision',
             executable='obstacle_avoidance_node',
@@ -123,7 +111,6 @@ def generate_launch_description():
             condition=IfCondition(LaunchConfiguration('use_vision'))
         ),
         
-        # Mock Lidar Publisher (when real lidar is not available)
         Node(
             package='uav_vision',
             executable='mock_lidar_publisher',

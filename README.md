@@ -34,7 +34,7 @@ Tài liệu này hướng dẫn chạy mô phỏng UAV không GPS với PX4 SITL
 
 ## Cài đặt & Build ROS2 workspace
 ```bash
-cd /home/dkzdragon02/UAV-no-GPS/ros2_ws
+cd ~/VUAV-DRONE-WITHOUT-GPS/ros2_ws
 source /opt/ros/humble/setup.bash
 colcon build
 source install/setup.bash
@@ -55,7 +55,7 @@ make px4_sitl gazebo   # hoặc dùng scripts/start_px4_sitl.sh empty iris
 
 **Terminal 2 – MAVROS**
 ```bash
-cd /home/dkzdragon02/UAV-no-GPS/ros2_ws
+cd ~/VUAV-DRONE-WITHOUT-GPS/ros2_ws
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 ros2 launch mavros px4.launch \
@@ -66,7 +66,7 @@ ros2 launch mavros px4.launch \
 
 **Terminal 3 – Dummy Vision Pose (quan trọng)**
 ```bash
-cd /home/dkzdragon02/UAV-no-GPS/ros2_ws
+cd ~/VUAV-DRONE-WITHOUT-GPS/ros2_ws
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 ros2 run uav_vision dummy_vision_pose
@@ -74,16 +74,18 @@ ros2 run uav_vision dummy_vision_pose
 
 **Terminal 4 – Stream setpoint vận tốc (0,0,0) trước khi ARM**
 ```bash
-cd /home/dkzdragon02/UAV-no-GPS/ros2_ws
+cd ~/VUAV-DRONE-WITHOUT-GPS/ros2_ws
 source /opt/ros/humble/setup.bash
 source install/setup.bash
-ros2 topic pub -r 20 /mavros/setpoint_velocity/cmd_vel geometry_msgs/msg/TwistStamped --file setpoint_zero.yaml
+ros2 topic pub -r 20 /mavros/setpoint_velocity/cmd_vel \
+  geometry_msgs/msg/TwistStamped \
+  "{header: {frame_id: 'map'}, twist: {linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}}"
 ```
 Giữ lệnh này chạy liên tục ≥5–10 s trước khi ARM.
 
 **Terminal 5 – ARM + OFFBOARD**
 ```bash
-cd /home/dkzdragon02/UAV-no-GPS/ros2_ws
+cd ~/VUAV-DRONE-WITHOUT-GPS/ros2_ws
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 
@@ -98,12 +100,14 @@ ros2 topic echo /mavros/state
 **Terminal 6 – Bay lên (z=1 m/s)**
 ```bash
 # Dừng Terminal 4 (Ctrl+C) trước khi đổi setpoint
-cd /home/dkzdragon02/UAV-no-GPS/ros2_ws
+cd ~/VUAV-DRONE-WITHOUT-GPS/ros2_ws
 source /opt/ros/humble/setup.bash
 source install/setup.bash
-ros2 topic pub -r 20 /mavros/setpoint_velocity/cmd_vel geometry_msgs/msg/TwistStamped --file setpoint_up.yaml
+ros2 topic pub -r 20 /mavros/setpoint_velocity/cmd_vel \
+  geometry_msgs/msg/TwistStamped \
+  "{header: {frame_id: 'map'}, twist: {linear: {x: 0.0, y: 0.0, z: 1.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}}"
 ```
-Muốn dừng: Ctrl+C rồi gửi lại `setpoint_zero.yaml`.
+Muốn dừng: Ctrl+C rồi gửi lại lệnh setpoint với z: 0.0.
 
 ---
 

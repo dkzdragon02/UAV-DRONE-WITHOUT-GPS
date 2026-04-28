@@ -5,17 +5,10 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 import os
 
-
-def generate_launch_description():
-    """Launch file cho ROS2-only setup (không cần ROS1 MAVROS)
-    
-    Sử dụng px4_mavlink_bridge để kết nối trực tiếp với PX4 qua MAVLink
-    """
-    
+def generate_launch_description(): 
     px4_autopilot_dir = os.path.expanduser('~/PX4-Autopilot')
     
     return LaunchDescription([
-        # Launch arguments
         DeclareLaunchArgument(
             'world',
             default_value='empty',
@@ -42,7 +35,6 @@ def generate_launch_description():
             description='Launch PX4 MAVLink bridge'
         ),
         
-        # PX4 MAVLink Bridge (ROS2-only, kết nối trực tiếp với PX4)
         Node(
             package='uav_vision',
             executable='px4_mavlink_bridge',
@@ -56,7 +48,6 @@ def generate_launch_description():
             condition=IfCondition(LaunchConfiguration('use_px4_bridge'))
         ),
         
-        # Vision Node
         Node(
             package='uav_vision',
             executable='vision_node',
@@ -73,7 +64,6 @@ def generate_launch_description():
             condition=IfCondition(LaunchConfiguration('use_vision'))
         ),
         
-        # Optical Flow Node
         Node(
             package='uav_vision',
             executable='optical_flow_node',

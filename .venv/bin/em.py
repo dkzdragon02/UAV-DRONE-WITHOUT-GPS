@@ -14,10 +14,6 @@ __contact__ = "software@alcyone.com"
 __copyright__ = "Copyright (C) 2002-2024 Erik Max Francis"
 __license__ = "BSD"
 
-#
-# imports
-#
-
 import codecs
 import copy
 import getopt
@@ -27,70 +23,26 @@ import re
 import sys
 import unicodedata
 
-#
-# compatibility
-#
-
-# Initializes the following global names based on Python 2.x vs. 3.x:
-#
-# - major             Detected major Python version
-# - minor             Detected minor Python version
-# - compat            List of Python backward-compatibility features applied
-# - narrow            Was Python built with narrow Unicode (UTF-16 natively)?
-# - modules           Is EmPy module support feasible?
-# - nativeStr         The native str type (str in Python 3.x; str in Python 2.x)
-# - str (_unicode)    The str type (str in Python 3.x; unicode in Python 2.x)
-# - bytes (_str)      The bytes type (bytes in Python 3.x; str in Python 2.x)
-# - strType           The str type (Python 3.x) or the bytes and str types (2.x)
-# - chr               The chr function (unichr in Python 2.x)
-# - input             The input function (raw_input in Python 2.x)
-# - evalFunc          The eval function
-# - execFunc          The exec function
-# - BaseException     The base exception class for all exceptions
-# - FileNotFoundError FileNotFoundError (= IOError in Python < 3.3)
-# - StringIO          The StringIO class
-# - isIdentifier      Is this string a valid Python identifier?
-# - uliteral          Return a version-specific wide Unicode literal ('\U...')
-# - toString          Convert an arbitrary object to a Unicode-compatible string
-
-# The major version of Python (2 or 3).
 major = sys.version_info[0]
-# The minor version of Python.
 minor = sys.version_info[1]
-# A list of Python backward-compatibility features which were applied.
 compat = []
-# The native str type/function.
 nativeStr = str
-# The eval function.
 evalFunc = eval
 if major == 2:
-    # We're using Python 2.x!  Make sure there are Python 3.x-like names for
-    # the basic types and functions; hereafter, use str for unicode and bytes
-    # for str, respectively.
     bytes = _str = str
     str = _unicode = unicode
     strType = (bytes, str)
     chr = unichr
     input = raw_input
-    # In Python 2.x, StringIO is contained in the cStringIO module.
     try:
         from cStringIO import StringIO
     except ImportError:
-        # If cStringIO is not present for some reason, try to use the slower
-        # StringIO module.
         from StringIO import StringIO
     if minor < 5:
-        # Starting with Python 2.5, a new BaseException class serves as the
-        # base class of all exceptions; prior to that, it was just Exception.
-        # So create a name for it if necessary.
         compat.append('BaseException')
         BaseException = Exception
-    # Python 2.x did not have a FileNotFoundError.
     FileNotFoundError = IOError
     compat.append('FileNotFoundError')
-    # In Python 2.x, exec is a statement; in Python 3.x, it's a function.  Make
-    # a new function that will simulate the Python 3.x form but work in Python
-    # 2.x.
     def execFunc(code, globals=None, locals=None):
         if globals is None:
             exec("""exec code""")
@@ -105,11 +57,8 @@ if major == 2:
             # Good to go.
             return value
         elif isinstance(value, _str):
-            # It's already a str (bytes), convert it to a unicode (str).
             return _unicode(value)
         else:
-            # In Python 2.x, __str__ returns a str, not a unicode.  Convert the
-            # object to a str (bytes), then convert it to a unicode (str).
             return _unicode(_str(value))
     def isIdentifier(string, first=True):
         """Is this string a valid identifier?  If first is true, make
@@ -127,24 +76,15 @@ if major == 2:
         """Return a wide Unicode string literal."""
         return r"u'\U%08x'" % i
 elif major >= 3:
-    # We're using Python 3.x!  Add Python 2.x-like names for the basic types
-    # and functions.  The name duplication is so that there will always be a
-    # definition of both str and types in the globals (as opposed to the
-    # builtins).
     bytes = _str = bytes
     str = _unicode = str
     strType = str
     chr = chr
     input = input
-    # In Python 3.x, the module containing StringIO is io.
     from io import StringIO
-    # Python 3.x prior to 3.3 did not have a FileNotFoundError.
     if minor < 3:
         FileNotFoundError = IOError
         compat.append('FileNotFoundError')
-    # In Python 3.x, exec is a function, but attempting to reference it as such
-    # in Python 2.x generates an error.  Since this needs to also compile in
-    # Python 2.x, defer the evaluation past the parsing phase.
     try:
         execFunc = evalFunc('exec')
     except NameError:
@@ -163,20 +103,14 @@ elif major >= 3:
         """Return a wide Unicode string literal."""
         return r"'\U%08x'" % i
 
-# Was this Python interpreter built with narrow Unicode?  That is, does it use
-# a UTF-16 encoding (with surrgoate pairs) vs. UTF-32 internally?
 if hasattr(sys, 'maxunicode'):
     narrow = sys.maxunicode < 0x10000
 else:
     narrow = len(evalFunc(uliteral(0x10000))) > 1
 if narrow:
-    # Narrow Python builds will raise a ValueError when calling chr (unichr) on
-    # a code point value outside of the Basic Multilingual Plane (U+0000
-    # .. U+FFFF).  See if it needs to be replaced.
     _chr = chr
     if major == 2:
         if minor >= 6:
-            # Versions 2.6 and up can use this struct/decode trick.
             compat.append('chr/decode')
             def chr(i, _chr=_chr):
                 if i < 0x10000:
@@ -188,7 +122,6 @@ if narrow:
                     except UnicodeDecodeError:
                         raise ValueError("chr() arg not in range")
         else:
-            # Earlier versions (2.5 and below) need to evaluate a literal.
             compat.append('chr/uliteral')
             def chr(i, _chr=_chr):
                 if i < 0x10000:
@@ -199,24 +132,15 @@ if narrow:
                     except (SyntaxError, UnicodeDecodeError):
                         raise ValueError("chr() arg not in range")
     compat.append('narrow')
-
-# Is EmPy module support feasible on this interpreter?
 modules = True
 if (major, minor) < (3, 4):
-    # importlib architecture didn't exist before Python 3.4.
     modules = False
 if ('python_implementation' in platform.__dict__ and
     platform.python_implementation() == 'IronPython'):
-    # importlib architecture doesn't work right in IronPython.
     modules = False
 if not modules:
     compat.append('!modules')
 
-#
-# constants
-#
-
-# Character information.
 UNDERSCORE_CHAR = '_'
 DOT_CHAR = '.'
 BACKSLASH_CHAR = '\\'
@@ -246,8 +170,6 @@ PHRASE_OPENING_CHARS = '(['
 CLOSING_CHARS = ')]}>'
 QUOTE_CHARS = '\'\"'
 ENDING_CHAR_MAP = {'(': ')', '[': ']', '{': '}', '<': '>'}
-
-# Environment variable names.
 OPTIONS_ENV = 'EMPY_OPTIONS'
 CONFIG_ENV = 'EMPY_CONFIG'
 PREFIX_ENV = 'EMPY_PREFIX'
@@ -265,28 +187,6 @@ OUTPUT_ENCODING_ENV = 'EMPY_OUTPUT_ENCODING'
 ERRORS_ENV = 'EMPY_ERRORS'
 INPUT_ERRORS_ENV = 'EMPY_INPUT_ERRORS'
 OUTPUT_ERRORS_ENV = 'EMPY_OUTPUT_ERRORS'
-
-# A regular expression string suffix which will match singificators; prepend
-# the interpreter prefix to make a full regular expression string.  A
-# successful match will yield six groups, arranged in two clusters of three.
-# Each cluster contains the following three named groups in index order:
-#
-# - string: A `!` to represent a stringized significator, or blank
-# - key: The significator key
-# - value: The significator value; can be blank
-#
-# The value should be stripped before being tested.  If it is blank and if the
-# significator is not stringized, then the resulting significator value will be
-# None.
-#
-# The first cluster (with group names ending in 2: string2, key2, value2)
-# matches multiline significators; the second (with group names ending in 1:
-# string1, key1, value1) matches singleline ones.  Only one of these clusters
-# will be set.
-#
-# The regular expression should be compiled with the following flags:
-# re.MULTILINE|re.DOTALL|re.VERBOSE.  To get a compiled regular expression
-# object for a given config, call `config.significatorRe()`.
 SIGNIFICATOR_RE_STRING_SUFFIX = r"""
                     # Flags: re.MULTILINE|re.DOTALL|re.VERBOSE
 %                   # Opening `%`
@@ -309,16 +209,10 @@ SIGNIFICATOR_RE_STRING_SUFFIX = r"""
 )                   # End choice
 $                   # End string
 """
-
-#
-# Error ...
-#
-
 class Error(Exception):
 
     def __init__(self, *args, **kwargs):
-        # super does not work here in Python 2.4.
-        Exception.__init__(self, *args)
+        Exception.__init__(self, *args)         # super does not work here in Python 2.4.
         self.__dict__.update(kwargs)
 
 class ConsistencyError(Error): pass
@@ -330,26 +224,14 @@ class StackUnderflowError(Error, IndexError): pass
 class UnknownEmojiError(Error, KeyError): pass
 class StringError(Error): pass
 class InvocationError(Error): pass
-
 class ConfigurationError(Error): pass
 class CompatibilityError(ConfigurationError): pass
 class ConfigurationFileNotFoundError(ConfigurationError, FileNotFoundError): pass
-
 class ParseError(Error): pass
 class TransientParseError(ParseError): pass
-
-#
-# Flow ...
-#
-
 class Flow(Exception): pass
 class ContinueFlow(Flow): pass
 class BreakFlow(Flow): pass
-
-#
-# Root
-#
-
 class Root(object):
 
     """The root class of all EmPy class hierarchies.  It defines a default
@@ -363,10 +245,6 @@ class Root(object):
             return '%s(%s)' % (self.__class__.__name__, toString(self))
         else:
             return '<%s @ 0x%x>' % (self.__class__.__name__, id(self))
-
-#
-# EmojiModuleInfo
-#
 
 class EmojiModuleInfo(Root):
 
@@ -412,12 +290,7 @@ class EmojiModuleInfo(Root):
         else:
             return result
 
-Module = EmojiModuleInfo # DEPRECATED
-
-#
-# module support
-#
-
+Module = EmojiModuleInfo 
 _pathFinderInstalled = False
 
 def _installPathFinder(index):
@@ -427,10 +300,6 @@ def _installPathFinder(index):
     import importlib
     import importlib.abc
     import importlib.util
-
-    #
-    # Loader
-    #
 
     class Loader(importlib.abc.Loader):
 
@@ -445,21 +314,15 @@ def _installPathFinder(index):
             assert interp
             interp.import_(self.filename, module)
 
-    #
-    # Finder
-    #
-
     class Finder(importlib.abc.PathEntryFinder):
 
         _EmPy_tag = None
 
         def find_spec(self, fullname, path, target=None):
-            # If the proxy is not installed, skip.
             method = getattr(sys.stdout, '_EmPy_current', None)
             if not method:
                 return None
             interp = method()
-            # If there's no active interpreter, also skip.
             if not interp:
                 return None
             if not path:
@@ -474,16 +337,11 @@ def _installPathFinder(index):
                             fullname, filename, loader=Loader(filename))
             return None
 
-    # Install the finder.
     finder = Finder()
     if index < 0:
         sys.meta_path.append(finder)
     else:
         sys.meta_path.insert(index, finder)
-
-#
-# Configuration
-#
 
 class Configuration(Root):
 
@@ -493,8 +351,6 @@ class Configuration(Root):
     interpreters.  To override the defaults of an interpreter, create a
     Configuration instance and then modify its attributes."""
 
-    # Constants.
-
     version = __version__
     bangpath = '#!'
     unknownScriptName = '<->'
@@ -502,19 +358,16 @@ class Configuration(Root):
     fullBuffering = -1
     noBuffering = 0
     lineBuffering = 1
-    unwantedGlobalsKeys = [None, '__builtins__'] # None = pseudomodule name
+    unwantedGlobalsKeys = [None, '__builtins__'] 
     unflattenableGlobalsKeys = ['globals']
     priorityVariables = ['checkVariables']
     ignoredConstructorArguments = []
     emojiModuleInfos = [
-        # module name, attribute name, wrapping format, capitaliztion, delimiters
         ('emoji', 'emojize', ':%s:', 'lowercase', 'underscores'),
         ('emojis', 'encode', ':%s:', 'lowercase', 'underscores'),
         ('emoji_data_python', 'replace_colons', ':%s:', 'lowercase', 'underscores'),
         ('unicodedata', 'lookup', '%s', 'both', 'spaces'),
     ]
-
-    # Defaults.
 
     defaultName = 'default'
     defaultPrefix = '@'
@@ -543,8 +396,6 @@ class Configuration(Root):
         'unicodedata',
     ]
 
-    # Statics.
-
     baseException = BaseException
     topLevelErrors = (ConfigurationError,)
     fallThroughErrors = (SyntaxError,)
@@ -558,14 +409,11 @@ class Configuration(Root):
         'args', 'message', 'add_note', 'characters_written', 'with_traceback',
     ]
 
-    tokens = None # list of token factories; intialized below
+    tokens = None           # list of token factories; intialized below
 
-    _initialized = False # change only in instances
-
-    # Dictionaries.
+    _initialized = False    # change only in instances
 
     controls = {
-        # C0 (ASCII, ISO 646, ECMA-6)
         'NUL':    (0x0000, "null"),
         'SOH':    (0x0001, "start of heading, transmission control one"),
         'TC1':    (0x0001, "start of heading, transmission control one"),
@@ -627,7 +475,6 @@ class Configuration(Root):
         'IS1':    (0x001f, "unit separator, information separator one"),
         'SP':     (0x0020, "space"),
         'DEL':    (0x007f, "delete"),
-        # C1 (ANSI X3.64, ISO 6429, ECMA-48)
         'PAD':    (0x0080, "padding character"),
         'HOP':    (0x0081, "high octet preset"),
         'BPH':    (0x0082, "break permitted here"),
@@ -660,11 +507,9 @@ class Configuration(Root):
         'OSC':    (0x009d, "operating system command"),
         'PM':     (0x009e, "privacy message"),
         'APC':    (0x009f, "application program command"),
-        # ISO 8859
         'NBSP':   (0x00a0, "no-break space"),
         'SHY':    (0x00ad, "soft hyphen, discretionary hyphen"),
         'CGJ':    (0x034f, "combining grapheme joiner"),
-        # Unicode, general punctuation
         'NQSP':   (0x2000, "en quad"),
         'MQSP':   (0x2001, "em quad; mutton quad"),
         'ENSP':   (0x2002, "en space; nut"),
@@ -701,7 +546,6 @@ class Configuration(Root):
         'AAFS':   (0x206d, "activate arabic form shaping"),
         'NADS':   (0x206e, "national digit shapes"),
         'NODS':   (0x206f, "nominal digit shapes"),
-        # Unicode, CJK symbols and punctuation
         'IDSP':   (0x3000, "ideographic space"),
         'IIM':    (0x3005, "ideographic iteration mark"),
         'ICM':    (0x3006, "ideographic closing mark"),
@@ -711,7 +555,6 @@ class Configuration(Root):
         'PAM':    (0x303d, "part alternation mark"),
         'IVI':    (0x303e, "ideographic variation indicator"),
         'IHFSP':  (0x303f, "ideograhic half fill space"),
-        # Unicode, variation selectors
         'VS1':    (0xfe00, "variation selector 1"),
         'VS2':    (0xfe01, "variation selector 2"),
         'VS3':    (0xfe02, "variation selector 3"),
@@ -730,10 +573,8 @@ class Configuration(Root):
         'TEXT':   (0xfe0e, "variation selector 15; text display"),
         'VS16':   (0xfe0f, "variation selector 16; emoji display"),
         'EMOJI':  (0xfe0f, "variation selector 16; emoji display"),
-        # Unicode, Arabic presentation forms
         'ZWNBSP': (0xfeff, "zero width no-break space; byte order mark"),
         'BOM':    (0xfeff, "zero width no-break space; byte order mark"),
-        # Unicode, specials
         'IAA':    (0xfff9, "interlinear annotation anchor"),
         'IAS':    (0xfffa, "interlinear annotation separator"),
         'IAT':    (0xfffb, "interlinear annotation terminator"),
@@ -926,18 +767,14 @@ class Configuration(Root):
 
     def __init__(self, **kwargs):
         self._initialized = False
-        # Meta variables.
         self._names = []
         self._specs = {}
         self._initials = {}
         self._descriptions = {}
         self._nones = {}
         self._functions = {}
-        # Initialize.
         self.initialize()
-        # Mark initialized.
         self._initialized = True
-        # Update with any keyword arguments, if specified.
         self.update(**kwargs)
 
     def __setattr__(self, name, value):
@@ -946,7 +783,7 @@ class Configuration(Root):
     def __contains__(self, name):
         return name in self.__dict__
 
-    def __bool__(self): return self._initialized # 3.x
+    def __bool__(self): return self._initialized    # 3.x
     def __nonzero__(self): return self._initialized # 2.x
 
     def __iter__(self):
@@ -957,8 +794,6 @@ class Configuration(Root):
         for name in self._names:
             results.append("%s=%r" % (name, self.get(name)))
         return ', '.join(results)
-
-    # Initialization.
 
     def initialize(self):
         """Setup the declarations and definitions for the defined
@@ -1012,14 +847,10 @@ class Configuration(Root):
         self.define('moduleFinderIndex', int, 0, "Index of module finder in meta path")
         self.define('enableImportOutput', bool, True, "Disable output during import?")
         self.define('duplicativeFirsts', list, list(DUPLICATIVE_CHARS), "List of duplicative first characters")
-
-        # Redefine static configuration variables so they're in the help.
         self.define('controls', dict, self.controls, "Controls dictionary")
         self.define('diacritics', dict, self.diacritics, "Diacritics dictionary")
         self.define('icons', dict, self.icons, "Icons dictionary")
         self.define('emojis', dict, self.emojis, "Emojis dictionary")
-        # If the encoding or error handling has changed, enable binary
-        # implicitly, just as if it had been specified on the command line.
         if (self.inputEncoding != defaultEncoding or
             self.outputEncoding != defaultEncoding or
             self.inputErrors != defaultErrors or
@@ -1044,8 +875,6 @@ class Configuration(Root):
             raise ConfigurationError("-d only makes sense with -o, -a, -O or -A arguments")
         if self.hasNoBuffering() and not self.hasBinary():
             raise ConfigurationError("no buffering requires file open in binary mode; try adding -u option")
-
-    # Access.
 
     def declare(self, name, specs, initial, description,
                 none=False, helpFunction=None):
@@ -1106,10 +935,8 @@ class Configuration(Root):
         if necessary."""
         if self._initialized and self.checkVariables:
             if not name.startswith('_'):
-                # If this attribute is not already present, it's invalid.
                 if not self.has(name):
                     raise ConfigurationError("unknown configuration attribute: `%s`" % name)
-                # If there's a registered type for this attribute, check it.
                 specs = self._specs.get(name)
                 if specs is not None:
                     if value is None:
@@ -1135,14 +962,11 @@ class Configuration(Root):
             copyMethod = copy.copy
         return copyMethod(self)
 
-    # Configuration file loading.
-
     def run(self, statements):
         """Run some configuration variable assignment statements."""
         locals = {self.configVariableName: self}
         execFunc(statements, globals(), locals)
         keys = list(locals.keys())
-        # Put the priority variables first.
         for priority in self.priorityVariables:
             if priority in locals:
                 keys.remove(priority)
@@ -1183,7 +1007,6 @@ class Configuration(Root):
         for filename in filenames:
             self.load(filename, required)
 
-    # Environment.
 
     def hasEnvironment(self, name):
         """Is the current environment variable defined in the environment?
@@ -1203,7 +1026,6 @@ class Configuration(Root):
         else:
             return default
 
-    # Convenience.
 
     def escaped(self, ord, prefix='\\'):
         """Write a valid Python string escape sequence for the given
@@ -1220,7 +1042,6 @@ class Configuration(Root):
         non-existent?"""
         return self.prefix is None or self.prefix == self.defaultPrefix
 
-    # Buffering.
 
     def hasFullBuffering(self): return self.buffering <= self.fullBuffering
     def hasNoBuffering(self): return self.buffering == self.noBuffering
@@ -1248,8 +1069,6 @@ class Configuration(Root):
         if self.buffering < self.fullBuffering:
             self.buffering = self.fullBuffering
         return self.buffering
-
-    # Token factories.
 
     def createFactory(self, tokens=None):
         """Create a token factory and return it."""
@@ -1281,8 +1100,6 @@ class Configuration(Root):
             {'first': first, 'last': last, 'name': name})
         return newType
 
-    # Binary/Unicode.
-
     def hasBinary(self):
         """Is binary/Unicode file open support enabled?"""
         return self.useBinary
@@ -1297,8 +1114,6 @@ class Configuration(Root):
     def disableBinary(self):
         """Disable binary/Unicode support for this configuration."""
         self.useBinary = False
-
-    # File I/O.
 
     def isDefaultEncodingErrors(self, encoding=None, errors=None, asInput=True):
         """Are both of the encoding/errors combinations the default?
@@ -1346,12 +1161,9 @@ class Configuration(Root):
         if expand:
             filename = os.path.expanduser(filename)
         if mode is None:
-            # Default to read.
             mode = 'r'
             if self.useBinary and 'b' not in mode:
-                # Make it binary if it needs to be.
                 mode += 'b'
-        # Figure out the encoding and error handler.
         if 'w' in mode or 'a' in mode:
             if encoding is None:
                 encoding = self.outputEncoding
@@ -1363,17 +1175,12 @@ class Configuration(Root):
             if errors is None:
                 errors = self.inputErrors
         if self.useBinary:
-            # Use binary mode, so call codecs.open.
             return codecs.open(filename, mode, encoding, errors, buffering)
         else:
-            # If it's not binary mode, them use the standard open call.
-            if major >= 3:
-                # If it's Python 3.x, just pass the arguments through.
-                return open(filename, mode, buffering, encoding, errors)
+            if major >= 3:                                                      # If it's not binary mode, them use the standard open call.
+
+                return open(filename, mode, buffering, encoding, errors)        # If it's Python 3.x, just pass the arguments through.
             else:
-                # For Python 2.x, open doesn't take encoding and error handler
-                # arguments.  Check to make sure non-default encodings and
-                # error handlers haven't been chosen, because we can't comply.
                 if not self.isDefaultEncodingErrors(encoding, errors):
                     raise ConfigurationError("cannot comply with non-default Unicode encoding/errors selected in Python 2.x; use -u option: `%s`/`%s`" % (encoding, errors))
                 return open(filename, mode, buffering)
@@ -1393,8 +1200,6 @@ class Configuration(Root):
         except (AssertionError, AttributeError):
             raise InvocationError("non-default Unicode output encoding/errors selected with %s; use -o/-a option instead: %s/%s" % (file.name, encoding, errors))
 
-    # Modules.
-
     def install(self, dryRun=False):
         """Install EmPy module support, if possible.  Mark a flag the first
         time this is called so it's only installed once, if ever."""
@@ -1413,8 +1218,6 @@ class Configuration(Root):
             _installPathFinder(self.moduleFinderIndex)
         return ok
 
-    # Significators.
-
     def significatorReString(self):
         """Return a string that can be compiled into a regular
         expression representing a significator.  If multi is true,
@@ -1431,8 +1234,6 @@ class Configuration(Root):
         """Return the significator name for this key."""
         prefix, suffix = self.significatorDelimiters
         return prefix + toString(key) + suffix
-
-    # Contexts.
 
     def setContextFormat(self, rawFormat):
         """Set the context format, auto-detecting which
@@ -1464,8 +1265,6 @@ class Configuration(Root):
             self.setContextFormat(self.contextFormat)
         return context.render(self.contextFormat, self.useContextFormatMethod)
 
-    # Icons.
-
     def calculateIconsSignature(self, icons=None):
         """Calculate a signature of the icons dict.  If the value
         changes, it's likely (but not certain) that the underlying
@@ -1475,8 +1274,6 @@ class Configuration(Root):
             icons = self.icons
         length = len(icons)
         try:
-            # Include the size of the dictionary, if possible.  If it's not
-            # available, that's okay.
             sizeof = sys.getsizeof(icons)
         except (AttributeError, TypeError):
             sizeof = -1
@@ -1523,26 +1320,19 @@ class Configuration(Root):
             self.signIcons(icons)
         return icons
 
-    # Emojis.
-
     def initializeEmojiModules(self, moduleNames=None):
         """Initialize the emoji modules.  If moduleNames is not
         specified, check the defaults.  Idempotent."""
         if self.emojiModules is None:
             okNames = []
-            # Use the config default if not specified.
             if moduleNames is None:
                 moduleNames = self.emojiModuleNames
-            # If it's still blank, specify no modules.
-            if moduleNames is None:
+            if moduleNames is None:                 # If it's still blank, specify no modules.
                 moduleNames = []
-            # Create a map of module names for fast lookup.  (This would be a
-            # set, but sets aren't available in early versions of Python 2.x.)
             nameMap = {}
             for moduleName in moduleNames:
                 nameMap[moduleName] = None
-            # Now iterate over each potential module.
-            self.emojiModules = {}
+            self.emojiModules = {}                  # Now iterate over each potential module.
             for info in self.emojiModuleInfos:
                 moduleName = info[0]
                 if moduleName in nameMap:
@@ -1550,8 +1340,6 @@ class Configuration(Root):
                     if module.ok:
                         okNames.append(moduleName)
                         self.emojiModules[moduleName] = module
-            # Finally, replace the requested module names with the ones
-            # actually present.
             self.emojiModuleNames = okNames
             if not self.emojiModules and not self.emojis:
                 raise ConfigurationError("no emoji lookup methods available; install modules and set emoji modules or set emojis dictionary in configuration")
@@ -1566,8 +1354,6 @@ class Configuration(Root):
             result = module.substitute(text)
             if result is not None:
                 return result
-
-    # Exit codes and errors.
 
     def isSuccessCode(self, code):
         """Does this exit code indicate success?"""
@@ -1587,7 +1373,6 @@ class Configuration(Root):
             if len(error.args) == 0:
                 return self.successCode
             else:
-                # This can be a string which is okay.
                 return error.args[0]
         else:
             return self.failureCode
@@ -1607,11 +1392,9 @@ class Configuration(Root):
             parts.append(prefix)
         parts.append(error.__class__.__name__)
         if self.verboseErrors:
-            # Check for arguments.
             if len(error.args) > 0:
                 parts.append(": ")
                 parts.append(", ".join([toString(x) for x in error.args]))
-            # Check for keyword arguments.
             pairs = []
             for attrib in dir(error):
                 if (attrib not in self.ignorableErrorAttributes and
@@ -1626,12 +1409,9 @@ class Configuration(Root):
                 for key, value in pairs:
                     args.append("%s=%s" % (key, value))
                 parts.append(', '.join(args))
-        # Fold the arguments together.
         if suffix is not None:
             parts.append(suffix)
         return ''.join(parts)
-
-    # Debugging.
 
     def printTraceback(self, file=sys.stderr):
         import types, traceback
@@ -1646,20 +1426,12 @@ class Configuration(Root):
             tb = types.TracebackType(tb, frame, frame.f_lasti, frame.f_lineno)
         traceback.print_tb(tb, file=file)
 
-#
-# Version
-#
-
 class Version(Root):
 
     """An enumerated type representing version detail levels."""
 
     NONE, VERSION, INFO, BASIC, PYTHON, SYSTEM, PLATFORM, RELEASE, ALL = range(9)
     DATA = BASIC
-
-#
-# Stack
-#
 
 class Stack(Root):
 
@@ -1670,8 +1442,8 @@ class Stack(Root):
             seq = []
         self.data = seq
 
-    def __bool__(self): return len(self.data) != 0 # 3.x
-    def __nonzero__(self): return len(self.data) != 0 # 2.x
+    def __bool__(self): return len(self.data) != 0      # 3.x
+    def __nonzero__(self): return len(self.data) != 0   # 2.x
 
     def __len__(self): return len(self.data)
     def __getitem__(self, index): return self.data[-(index + 1)]

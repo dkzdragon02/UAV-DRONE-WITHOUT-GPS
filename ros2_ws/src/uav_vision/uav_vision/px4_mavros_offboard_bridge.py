@@ -1,59 +1,44 @@
-#!/usr/bin/env python3
-"""
-PX4 MAVROS Offboard Bridge
-
-- Nhận lệnh vận tốc từ controller nội bộ (ví dụ PX4Controller)
-- Gửi setpoint velocity cho PX4 qua MAVROS
-- Tự động ARM + chuyển sang OFFBOARD khi đã có kết nối
-
-Thiết kế tối giản để chạy trong SITL:
-- Input:  geometry_msgs/msg/TwistStamped trên topic cấu hình (mặc định: /uav/px4_controller/velocity)
-- Output: geometry_msgs/msg/TwistStamped -> /mavros/setpoint_velocity/cmd_vel
-"""
-
 import time
 from typing import Optional
-
 import rclpy
 from rclpy.node import Node
-
+from uav_vision.qos_profiles import mavros_qos as make_mavros_qos
 from geometry_msgs.msg import TwistStamped
 from mavros_msgs.msg import State
 from mavros_msgs.srv import CommandBool, SetMode
 
-
 class Px4MavrosOffboardBridge(Node):
-    """Bridge giữa controller nội bộ và PX4 thông qua MAVROS (OFFBOARD)"""
-
     def __init__(self) -> None:
         super().__init__("px4_mavros_offboard_bridge")
-
-        # Parameters
         self.declare_parameter("velocity_input_topic", "/uav/px4_controller/velocity")
         self.declare_parameter("mavros_velocity_topic", "/mavros/setpoint_velocity/cmd_vel")
         self.declare_parameter("offboard_mode", "OFFBOARD")
         self.declare_parameter("auto_arm", True)
         self.declare_parameter("auto_offboard", True)
         self.declare_parameter("setpoint_rate_hz", 20.0)
+        self.declare_parameter("cmd_stale_timeout", 1.0)  # seconds — revert to hover if no new cmd
 
         velocity_input_topic = self.get_parameter("velocity_input_topic").value
         mavros_velocity_topic = self.get_parameter("mavros_velocity_topic").value
+
         self.offboard_mode = self.get_parameter("offboard_mode").value
         self.auto_arm = bool(self.get_parameter("auto_arm").value)
         self.auto_offboard = bool(self.get_parameter("auto_offboard").value)
         self.setpoint_dt = 1.0 / float(self.get_parameter("setpoint_rate_hz").value)
-
-        # State
+        self.cmd_stale_timeout = float(self.get_parameter("cmd_stale_timeout").value)
         self.current_state: Optional[State] = None
         self.last_cmd: Optional[TwistStamped] = None
+        self.last_cmd_time: float = 0.0
         self.last_state_time: float = 0.0
+        self._cmd_stale_warned: bool = False
 
-        # Subscribers
+        mavros_qos = make_mavros_qos()
+
         self.state_sub = self.create_subscription(
             State,
             "/mavros/state",
             self.state_callback,
-            10,
+            mavros_qos,
         )
         self.velocity_sub = self.create_subscription(
             TwistStamped,
@@ -62,18 +47,14 @@ class Px4MavrosOffboardBridge(Node):
             10,
         )
 
-        # Publishers
         self.velocity_pub = self.create_publisher(
             TwistStamped,
             mavros_velocity_topic,
             10,
         )
 
-        # Service clients
         self.arming_client = self.create_client(CommandBool, "/mavros/cmd/arming")
         self.set_mode_client = self.create_client(SetMode, "/mavros/set_mode")
-
-        # Timers
         self.setpoint_timer = self.create_timer(self.setpoint_dt, self.publish_setpoint)
         self.supervisor_timer = self.create_timer(1.0, self.offboard_supervisor)
 
@@ -82,31 +63,28 @@ class Px4MavrosOffboardBridge(Node):
             f"Input: {velocity_input_topic}, Output: {mavros_velocity_topic}"
         )
 
-    # --------------------------------------------------------------------- #
-    # Callbacks
-    # --------------------------------------------------------------------- #
-
     def state_callback(self, msg: State) -> None:
         self.current_state = msg
         self.last_state_time = time.time()
 
     def velocity_callback(self, msg: TwistStamped) -> None:
-        """Lưu lệnh vận tốc cuối cùng từ controller nội bộ."""
         self.last_cmd = msg
-
-    # --------------------------------------------------------------------- #
-    # Core logic
-    # --------------------------------------------------------------------- #
+        self.last_cmd_time = time.time()
+        if self._cmd_stale_warned:
+            self.get_logger().info("Controller velocity recovered — resuming forwarding")
+            self._cmd_stale_warned = False
 
     def publish_setpoint(self) -> None:
-        """
-        Gửi setpoint velocity tới PX4 ở tần số cố định.
+        now = time.time()
+        cmd_age = now - self.last_cmd_time if self.last_cmd_time > 0 else float('inf')
 
-        PX4 yêu cầu stream OFFBOARD setpoints liên tục (>= 2Hz),
-        nên ngay cả khi không có lệnh mới, ta giữ lại lệnh cuối.
-        """
-        if self.last_cmd is None:
-            # Nếu chưa có lệnh nào, publish zero để giữ kết nối
+        if self.last_cmd is None or cmd_age > self.cmd_stale_timeout:
+            if self.last_cmd is not None and cmd_age > self.cmd_stale_timeout and not self._cmd_stale_warned:
+                self.get_logger().warn(
+                    f"Controller velocity stale ({cmd_age:.1f}s > {self.cmd_stale_timeout}s) — "
+                    f"reverting to HOVER (zero velocity). Is PX4Controller alive?"
+                )
+                self._cmd_stale_warned = True
             msg = TwistStamped()
             msg.header.stamp = self.get_clock().now().to_msg()
             msg.twist.linear.x = 0.0
@@ -119,7 +97,6 @@ class Px4MavrosOffboardBridge(Node):
         self.velocity_pub.publish(msg)
 
     def offboard_supervisor(self) -> None:
-        """Định kỳ kiểm tra trạng thái PX4 và tự động ARM / OFFBOARD nếu cần."""
         if self.current_state is None:
             self.get_logger().warn("Waiting for /mavros/state ...", throttle_duration_sec=5.0)
             return
@@ -128,17 +105,11 @@ class Px4MavrosOffboardBridge(Node):
             self.get_logger().warn("PX4 not connected (via MAVROS)", throttle_duration_sec=5.0)
             return
 
-        # Arm if needed
         if self.auto_arm and not self.current_state.armed:
             self.try_arm()
 
-        # Switch to OFFBOARD if needed
         if self.auto_offboard and self.current_state.mode != self.offboard_mode:
             self.try_set_mode(self.offboard_mode)
-
-    # --------------------------------------------------------------------- #
-    # Service helpers
-    # --------------------------------------------------------------------- #
 
     def try_arm(self) -> None:
         if not self.arming_client.wait_for_service(timeout_sec=0.5):
@@ -154,7 +125,7 @@ class Px4MavrosOffboardBridge(Node):
         def _done_cb(fut):
             try:
                 resp = fut.result()
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc: 
                 self.get_logger().error(f"Arm call failed: {exc}")
                 return
 
@@ -179,7 +150,7 @@ class Px4MavrosOffboardBridge(Node):
         def _done_cb(fut):
             try:
                 resp = fut.result()
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:  
                 self.get_logger().error(f"SetMode call failed: {exc}")
                 return
 
@@ -190,7 +161,6 @@ class Px4MavrosOffboardBridge(Node):
 
         future.add_done_callback(_done_cb)
 
-
 def main(args=None) -> None:
     rclpy.init(args=args)
     node = Px4MavrosOffboardBridge()
@@ -200,8 +170,8 @@ def main(args=None) -> None:
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
-
+        if rclpy.ok():
+            rclpy.shutdown()
 
 if __name__ == "__main__":
     main()

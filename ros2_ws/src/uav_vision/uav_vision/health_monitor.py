@@ -1,9 +1,3 @@
-#!/usr/bin/env python3
-"""
-Health Monitor and Watchdog System
-Monitors node health and provides watchdog functionality
-"""
-
 import time
 import threading
 from typing import Dict, Callable, Optional, List
@@ -12,18 +6,14 @@ from dataclasses import dataclass, field
 from collections import deque
 import logging
 
-
 class HealthStatus(Enum):
-    """Health status enumeration"""
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     UNHEALTHY = "unhealthy"
     CRITICAL = "critical"
 
-
 @dataclass
 class HealthCheck:
-    """Health check definition"""
     name: str
     check_func: Callable[[], bool]
     timeout: float = 5.0
@@ -33,10 +23,8 @@ class HealthCheck:
     consecutive_failures: int = 0
     max_failures: int = 3
 
-
 @dataclass
 class ComponentHealth:
-    """Component health information"""
     name: str
     status: HealthStatus
     last_update: float
@@ -45,52 +33,24 @@ class ComponentHealth:
     checks: Dict[str, bool] = field(default_factory=dict)
     message: str = ""
 
-
 class HealthMonitor:
-    """
-    Health monitor and watchdog system.
-    
-    Monitors:
-    - Node heartbeat
-    - Component health
-    - Resource usage
-    - Error rates
-    """
-    
     def __init__(
         self,
         node_name: str,
         heartbeat_timeout: float = 5.0,
         check_interval: float = 1.0
     ):
-        """
-        Initialize health monitor.
-        
-        Args:
-            node_name: Name of the node being monitored
-            heartbeat_timeout: Heartbeat timeout in seconds
-            check_interval: Health check interval in seconds
-        """
         self.node_name = node_name
         self.heartbeat_timeout = heartbeat_timeout
-        self.check_interval = check_interval
-        
+        self.check_interval = check_interval 
         self.logger = logging.getLogger(__name__)
-        
-        # Health checks
         self._health_checks: Dict[str, HealthCheck] = {}
         self._components: Dict[str, ComponentHealth] = {}
-        
-        # Heartbeat tracking
         self._last_heartbeat = time.time()
         self._heartbeat_lock = threading.Lock()
-        
-        # Monitoring thread
         self._monitoring = False
         self._monitor_thread: Optional[threading.Thread] = None
         self._monitor_lock = threading.Lock()
-        
-        # Statistics
         self._error_history = deque(maxlen=100)
         self._uptime_start = time.time()
     
@@ -102,16 +62,6 @@ class HealthMonitor:
         critical: bool = False,
         max_failures: int = 3
     ):
-        """
-        Register a health check.
-        
-        Args:
-            name: Name of the health check
-            check_func: Function that returns True if healthy
-            timeout: Timeout for the check
-            critical: Whether this is a critical check
-            max_failures: Maximum consecutive failures before unhealthy
-        """
         check = HealthCheck(
             name=name,
             check_func=check_func,
@@ -123,12 +73,6 @@ class HealthMonitor:
         self.logger.info(f"Registered health check: {name}")
     
     def register_component(self, name: str):
-        """
-        Register a component for monitoring.
-        
-        Args:
-            name: Component name
-        """
         component = ComponentHealth(
             name=name,
             status=HealthStatus.HEALTHY,
@@ -146,15 +90,6 @@ class HealthMonitor:
         error_count: int = 0,
         message: str = ""
     ):
-        """
-        Update component health status.
-        
-        Args:
-            name: Component name
-            status: Health status
-            error_count: Error count
-            message: Status message
-        """
         if name not in self._components:
             self.register_component(name)
         
@@ -166,39 +101,22 @@ class HealthMonitor:
         component.uptime = time.time() - self._uptime_start
     
     def update_heartbeat(self):
-        """Update heartbeat timestamp."""
         with self._heartbeat_lock:
             self._last_heartbeat = time.time()
     
     def is_heartbeat_healthy(self) -> bool:
-        """
-        Check if heartbeat is healthy.
-        
-        Returns:
-            True if heartbeat is within timeout, False otherwise
-        """
         with self._heartbeat_lock:
             elapsed = time.time() - self._last_heartbeat
             return elapsed < self.heartbeat_timeout
     
     def get_overall_health(self) -> HealthStatus:
-        """
-        Get overall health status.
-        
-        Returns:
-            Overall health status
-        """
-        # Check heartbeat
         if not self.is_heartbeat_healthy():
             return HealthStatus.CRITICAL
-        
-        # Check critical health checks
         for check in self._health_checks.values():
             if check.critical and not check.last_result:
                 if check.consecutive_failures >= check.max_failures:
                     return HealthStatus.CRITICAL
-        
-        # Check components
+
         critical_components = [
             comp for comp in self._components.values()
             if comp.status == HealthStatus.CRITICAL
@@ -223,18 +141,30 @@ class HealthMonitor:
         return HealthStatus.HEALTHY
     
     def run_health_checks(self):
-        """Run all registered health checks."""
         for name, check in self._health_checks.items():
             try:
-                start_time = time.time()
-                result = check.check_func()
-                elapsed = time.time() - start_time
-                
-                if elapsed > check.timeout:
+                result_holder = [None]
+                exception_holder = [None]
+
+                def _run_check():
+                    try:
+                        result_holder[0] = check.check_func()
+                    except Exception as e:
+                        exception_holder[0] = e
+
+                thread = threading.Thread(target=_run_check, daemon=True)
+                thread.start()
+                thread.join(timeout=check.timeout)
+
+                if thread.is_alive():
                     self.logger.warning(
-                        f"Health check '{name}' exceeded timeout: {elapsed:.2f}s > {check.timeout}s"
+                        f"Health check '{name}' exceeded timeout: {check.timeout}s"
                     )
                     result = False
+                elif exception_holder[0] is not None:
+                    raise exception_holder[0]
+                else:
+                    result = bool(result_holder[0])
                 
                 check.last_check = time.time()
                 
@@ -259,7 +189,6 @@ class HealthMonitor:
                 check.consecutive_failures += 1
     
     def start_monitoring(self):
-        """Start health monitoring thread."""
         with self._monitor_lock:
             if self._monitoring:
                 return
@@ -273,7 +202,6 @@ class HealthMonitor:
             self.logger.info("Health monitoring started")
     
     def stop_monitoring(self):
-        """Stop health monitoring thread."""
         with self._monitor_lock:
             if not self._monitoring:
                 return
@@ -284,7 +212,6 @@ class HealthMonitor:
             self.logger.info("Health monitoring stopped")
     
     def _monitor_loop(self):
-        """Main monitoring loop."""
         while self._monitoring:
             try:
                 self.run_health_checks()
@@ -294,12 +221,6 @@ class HealthMonitor:
                 time.sleep(self.check_interval)
     
     def record_error(self, error: Exception):
-        """
-        Record an error.
-        
-        Args:
-            error: The exception that occurred
-        """
         self._error_history.append({
             "timestamp": time.time(),
             "error": str(error),
@@ -307,12 +228,6 @@ class HealthMonitor:
         })
     
     def get_health_report(self) -> Dict:
-        """
-        Get comprehensive health report.
-        
-        Returns:
-            Dictionary with health information
-        """
         return {
             "node_name": self.node_name,
             "overall_status": self.get_overall_health().value,
@@ -336,6 +251,6 @@ class HealthMonitor:
                 }
                 for name, comp in self._components.items()
             },
-            "recent_errors": list(self._error_history)[-10:]  # Last 10 errors
+            "recent_errors": list(self._error_history)[-10:]  
         }
 

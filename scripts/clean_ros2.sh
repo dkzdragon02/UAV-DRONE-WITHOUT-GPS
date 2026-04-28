@@ -11,7 +11,6 @@ echo ""
 
 cd "$PROJECT_DIR/ros2_ws"
 
-# Ask for confirmation
 read -p "This will delete build/, install/, and log/ directories. Continue? (y/N) " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -19,7 +18,6 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 0
 fi
 
-# Remove ROS2 build artifacts
 echo "Removing build/ directory..."
 rm -rf build/
 

@@ -4,12 +4,8 @@ from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
-
-def generate_launch_description():
-    """Launch file cho SLAM system với loop closure"""
-    
+def generate_launch_description():   
     return LaunchDescription([
-        # Launch arguments
         DeclareLaunchArgument(
             'camera_topic',
             default_value='/camera/image_raw',
@@ -31,7 +27,6 @@ def generate_launch_description():
             description='Use PX4 MAVLink bridge'
         ),
         
-        # SLAM Node
         Node(
             package='uav_vision',
             executable='slam_node',
@@ -47,8 +42,7 @@ def generate_launch_description():
             output='screen',
             condition=IfCondition(LaunchConfiguration('use_slam'))
         ),
-        
-        # State Machine
+
         Node(
             package='uav_vision',
             executable='state_machine',
@@ -62,7 +56,6 @@ def generate_launch_description():
             condition=IfCondition(LaunchConfiguration('use_state_machine'))
         ),
         
-        # Path Planner
         Node(
             package='uav_vision',
             executable='path_planner',
@@ -74,7 +67,6 @@ def generate_launch_description():
             output='screen',
         ),
         
-        # PX4 Controller
         Node(
             package='uav_vision',
             executable='px4_controller',
@@ -87,14 +79,13 @@ def generate_launch_description():
             output='screen',
         ),
         
-        # PX4 MAVLink Bridge
         Node(
             package='uav_vision',
             executable='px4_mavlink_bridge',
             name='px4_mavlink_bridge',
             parameters=[{
                 'px4_connection': 'udp:127.0.0.1:14540',
-                'vision_odom_topic': '/uav/slam/odometry',  # Use SLAM odometry
+                'vision_odom_topic': '/uav/slam/odometry',  
                 'send_rate': 30.0,
             }],
             output='screen',

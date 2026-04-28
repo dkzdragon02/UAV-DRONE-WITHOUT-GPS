@@ -87,8 +87,8 @@ mkdir -p logs
 
 # Make scripts executable
 echo -e "${YELLOW}Making scripts executable...${NC}"
-chmod +x scripts/*.sh
-chmod +x tools/*.py
+[ -d scripts ] && chmod +x scripts/*.sh 2>/dev/null || true
+[ -d tools ] && chmod +x tools/*.py 2>/dev/null || true
 
 echo ""
 echo -e "${GREEN}=========================================="
@@ -97,7 +97,7 @@ echo "==========================================${NC}"
 echo ""
 echo "Next steps:"
 echo "1. Source the workspace:"
-echo "   cd ~/UAV-no-GPS/ros2_ws"
+echo "   cd ~/VUAV-DRONE-WITHOUT-GPS/ros2_ws"
 echo "   source /opt/ros/humble/setup.bash"
 echo "   source install/setup.bash"
 echo ""

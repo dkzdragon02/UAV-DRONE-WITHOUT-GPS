@@ -1,7 +1,3 @@
-"""
-Unit tests for HealthMonitor
-"""
-
 import pytest
 import time
 import threading
@@ -11,20 +7,14 @@ from uav_vision.health_monitor import (
     HealthStatus
 )
 
-
-class TestHealthMonitor:
-    """Test suite for HealthMonitor"""
-    
+class TestHealthMonitor: 
     def test_init(self):
-        """Test initialization"""
-        monitor = HealthMonitor('test_node', heartbeat_timeout=5.0)
-        
+        monitor = HealthMonitor('test_node', heartbeat_timeout=5.0)    
         assert monitor.node_name == 'test_node'
         assert monitor.heartbeat_timeout == 5.0
         assert monitor._monitoring is False
     
     def test_register_health_check(self):
-        """Test registering health check"""
         monitor = HealthMonitor('test_node')
         
         def check_func():
@@ -44,7 +34,6 @@ class TestHealthMonitor:
         assert check.timeout == 5.0
     
     def test_register_component(self):
-        """Test registering component"""
         monitor = HealthMonitor('test_node')
         monitor.register_component('test_component')
         
@@ -54,7 +43,6 @@ class TestHealthMonitor:
         assert component.status == HealthStatus.HEALTHY
     
     def test_update_heartbeat(self):
-        """Test updating heartbeat"""
         monitor = HealthMonitor('test_node')
         initial_time = monitor._last_heartbeat
         
@@ -64,22 +52,15 @@ class TestHealthMonitor:
         assert monitor._last_heartbeat > initial_time
     
     def test_is_heartbeat_healthy(self):
-        """Test heartbeat health check"""
         monitor = HealthMonitor('test_node', heartbeat_timeout=1.0)
-        
-        # Just updated, should be healthy
         monitor.update_heartbeat()
         assert monitor.is_heartbeat_healthy() is True
-        
-        # Wait longer than timeout
-        time.sleep(1.1)
+        time.sleep(1.5)
         assert monitor.is_heartbeat_healthy() is False
     
     def test_update_component_health(self):
-        """Test updating component health"""
         monitor = HealthMonitor('test_node')
         monitor.register_component('test_component')
-        
         monitor.update_component_health(
             'test_component',
             HealthStatus.UNHEALTHY,
@@ -93,7 +74,6 @@ class TestHealthMonitor:
         assert component.message == 'Test message'
     
     def test_get_overall_health_healthy(self):
-        """Test getting overall health when healthy"""
         monitor = HealthMonitor('test_node')
         monitor.update_heartbeat()
         
@@ -101,17 +81,14 @@ class TestHealthMonitor:
         assert status == HealthStatus.HEALTHY
     
     def test_get_overall_health_critical_heartbeat(self):
-        """Test overall health with critical heartbeat failure"""
         monitor = HealthMonitor('test_node', heartbeat_timeout=0.1)
         
-        # Wait for heartbeat timeout
         time.sleep(0.2)
         
         status = monitor.get_overall_health()
         assert status == HealthStatus.CRITICAL
     
     def test_get_overall_health_critical_component(self):
-        """Test overall health with critical component"""
         monitor = HealthMonitor('test_node')
         monitor.update_heartbeat()
         
@@ -125,7 +102,6 @@ class TestHealthMonitor:
         assert status == HealthStatus.CRITICAL
     
     def test_get_overall_health_unhealthy_component(self):
-        """Test overall health with unhealthy component"""
         monitor = HealthMonitor('test_node')
         monitor.update_heartbeat()
         
@@ -139,7 +115,6 @@ class TestHealthMonitor:
         assert status == HealthStatus.UNHEALTHY
     
     def test_get_overall_health_degraded_component(self):
-        """Test overall health with degraded component"""
         monitor = HealthMonitor('test_node')
         monitor.update_heartbeat()
         
@@ -153,7 +128,6 @@ class TestHealthMonitor:
         assert status == HealthStatus.DEGRADED
     
     def test_run_health_checks_success(self):
-        """Test running health checks with success"""
         monitor = HealthMonitor('test_node')
         
         check_called = [False]
@@ -171,7 +145,6 @@ class TestHealthMonitor:
         assert check.consecutive_failures == 0
     
     def test_run_health_checks_failure(self):
-        """Test running health checks with failure"""
         monitor = HealthMonitor('test_node')
         
         def check_func():
@@ -185,11 +158,10 @@ class TestHealthMonitor:
         assert check.consecutive_failures == 1
     
     def test_run_health_checks_timeout(self):
-        """Test health check timeout"""
         monitor = HealthMonitor('test_node')
         
         def slow_check():
-            time.sleep(0.2)  # Longer than timeout
+            time.sleep(0.2)
             return True
         
         monitor.register_health_check('slow_check', slow_check, timeout=0.1)
@@ -199,7 +171,6 @@ class TestHealthMonitor:
         assert check.last_result is False
     
     def test_run_health_checks_exception(self):
-        """Test health check with exception"""
         monitor = HealthMonitor('test_node')
         
         def failing_check():
@@ -213,22 +184,19 @@ class TestHealthMonitor:
         assert check.consecutive_failures == 1
     
     def test_start_stop_monitoring(self):
-        """Test starting and stopping monitoring"""
         monitor = HealthMonitor('test_node', check_interval=0.1)
-        
         monitor.start_monitoring()
+        
         assert monitor._monitoring is True
         assert monitor._monitor_thread is not None
         assert monitor._monitor_thread.is_alive()
-        
-        # Wait a bit
+    
         time.sleep(0.2)
         
         monitor.stop_monitoring()
         assert monitor._monitoring is False
     
     def test_record_error(self):
-        """Test recording errors"""
         monitor = HealthMonitor('test_node')
         
         error = ValueError("Test error")
@@ -240,10 +208,8 @@ class TestHealthMonitor:
         assert 'Test error' in error_record['error']
     
     def test_get_health_report(self):
-        """Test getting health report"""
         monitor = HealthMonitor('test_node')
         monitor.update_heartbeat()
-        
         monitor.register_health_check('test_check', lambda: True)
         monitor.register_component('test_component')
         

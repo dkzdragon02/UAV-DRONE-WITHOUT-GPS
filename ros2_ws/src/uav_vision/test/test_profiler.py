@@ -1,7 +1,3 @@
-"""
-Unit tests for profiler
-"""
-
 import pytest
 import time
 from uav_vision.profiler import (
@@ -13,12 +9,9 @@ from uav_vision.profiler import (
 
 
 class TestProfiler:
-    """Test suite for Profiler"""
-    
     def test_profiler_start_stop(self):
-        """Test starting and stopping profiler"""
         profiler = Profiler()
-        
+
         assert profiler.enabled is False
         profiler.start()
         assert profiler.enabled is True
@@ -26,7 +19,6 @@ class TestProfiler:
         assert profiler.enabled is False
     
     def test_profiler_reset(self):
-        """Test resetting profiler"""
         profiler = Profiler()
         profiler.start()
         profiler.stop()
@@ -36,11 +28,9 @@ class TestProfiler:
         assert len(profiler.stats) == 0
     
     def test_profiler_basic(self):
-        """Test basic profiling"""
         profiler = Profiler()
         profiler.start()
         
-        # Do some work
         def test_func():
             time.sleep(0.01)
             return sum(range(100))
@@ -54,10 +44,7 @@ class TestProfiler:
 
 
 class TestFunctionProfiler:
-    """Test suite for FunctionProfiler"""
-    
     def test_function_profiler_decorator(self):
-        """Test function profiler as decorator"""
         FunctionProfiler.reset()
         
         @profile_function
@@ -68,12 +55,13 @@ class TestFunctionProfiler:
         result = test_func(5)
         
         assert result == 10
-        stats = FunctionProfiler.get_stats('test_profiler.test_func')
-        assert stats['call_count'] == 1
-        assert stats['total_time'] > 0
+        all_stats = FunctionProfiler.get_stats()
+        matching = [v for k, v in all_stats.items() if 'test_func' in k]
+        assert len(matching) == 1
+        assert matching[0]['call_count'] == 1
+        assert matching[0]['total_time'] > 0
     
     def test_function_profiler_multiple_calls(self):
-        """Test profiling multiple function calls"""
         FunctionProfiler.reset()
         
         @profile_function
@@ -84,11 +72,12 @@ class TestFunctionProfiler:
         test_func(2)
         test_func(3)
         
-        stats = FunctionProfiler.get_stats('test_profiler.test_func')
-        assert stats['call_count'] == 3
+        all_stats = FunctionProfiler.get_stats()
+        matching = [v for k, v in all_stats.items() if 'test_func' in k]
+        assert len(matching) == 1
+        assert matching[0]['call_count'] == 3
     
     def test_function_profiler_summary(self):
-        """Test getting summary"""
         FunctionProfiler.reset()
         
         @profile_function
@@ -107,10 +96,7 @@ class TestFunctionProfiler:
 
 
 class TestPerformanceBenchmark:
-    """Test suite for PerformanceBenchmark"""
-    
     def test_benchmark_basic(self):
-        """Test basic benchmarking"""
         benchmark = PerformanceBenchmark()
         
         def test_func():
@@ -124,7 +110,6 @@ class TestPerformanceBenchmark:
         assert result['throughput'] > 0
     
     def test_benchmark_compare(self):
-        """Test comparing benchmarks"""
         benchmark = PerformanceBenchmark()
         
         def fast_func():
@@ -143,7 +128,6 @@ class TestPerformanceBenchmark:
         assert comparison['fast']['avg'] < comparison['slow']['avg']
     
     def test_benchmark_reset(self):
-        """Test resetting benchmark"""
         benchmark = PerformanceBenchmark()
         
         def test_func():

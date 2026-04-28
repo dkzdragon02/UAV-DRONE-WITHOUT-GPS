@@ -23,8 +23,10 @@ if [ ! -f "build/px4_sitl_default/bin/px4" ]; then
 fi
 
 # Chọn world và model
+# QUAN TRỌNG: Dùng iris_vision vì dự án VUAV-DRONE-WITHOUT-GPS không dùng GPS
+# iris_vision tự động set EKF2 cho External Vision + tắt GPS
 WORLD=${1:-empty}  # empty, iris, standard_vtol
-MODEL=${2:-iris}   # iris, standard_vtol, etc.
+MODEL=${2:-gazebo-classic_iris_vision}   # gazebo-classic_iris_vision (no GPS), iris (GPS), etc.
 
 echo "World: $WORLD"
 echo "Model: $MODEL"

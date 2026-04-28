@@ -1,32 +1,20 @@
-#!/usr/bin/env python3
-"""
-Evaluation Metrics và Benchmarking Tools
-Đánh giá performance của SLAM và navigation system
-"""
-
 import numpy as np
 from typing import List, Tuple, Dict
 from collections import deque
 import time
 import math
 
-
-class SLAMEvaluator:
-    """Evaluator cho SLAM system"""
-    
+class SLAMEvaluator:  
     def __init__(self):
-        self.ground_truth_poses = []  # Ground truth poses (if available)
+        self.ground_truth_poses = []                # Ground truth poses (if available)
         self.estimated_poses = []
         self.timestamps = []
-        
-        # Metrics
         self.errors = {
             'position': [],
             'orientation': [],
             'trajectory': []
         }
         
-        # Statistics
         self.stats = {
             'total_frames': 0,
             'successful_frames': 0,
@@ -36,7 +24,6 @@ class SLAMEvaluator:
         }
     
     def add_pose(self, estimated_pose: np.ndarray, ground_truth: np.ndarray = None, timestamp: float = None):
-        """Add pose estimate"""
         self.estimated_poses.append(estimated_pose.copy())
         
         if ground_truth is not None:
@@ -46,18 +33,13 @@ class SLAMEvaluator:
             timestamp = time.time()
         self.timestamps.append(timestamp)
         
-        # Compute error if ground truth available
         if ground_truth is not None and len(self.ground_truth_poses) > 0:
             error = self.compute_error(estimated_pose, ground_truth)
             self.errors['position'].append(error['position'])
             self.errors['orientation'].append(error['orientation'])
     
     def compute_error(self, estimated: np.ndarray, ground_truth: np.ndarray) -> Dict:
-        """Compute error between estimated and ground truth"""
-        # Position error
         pos_error = np.linalg.norm(estimated[:2] - ground_truth[:2])
-        
-        # Orientation error (yaw)
         yaw_error = abs(estimated[2] - ground_truth[2])
         yaw_error = min(yaw_error, 2 * math.pi - yaw_error)  # Wrap to [0, pi]
         
@@ -67,41 +49,34 @@ class SLAMEvaluator:
         }
     
     def compute_metrics(self) -> Dict:
-        """Compute evaluation metrics"""
         metrics = {}
         
         if len(self.errors['position']) > 0:
-            # Position metrics
             metrics['mae_position'] = np.mean(self.errors['position'])
             metrics['rmse_position'] = np.sqrt(np.mean([e**2 for e in self.errors['position']]))
             metrics['max_position_error'] = np.max(self.errors['position'])
             metrics['std_position_error'] = np.std(self.errors['position'])
         
         if len(self.errors['orientation']) > 0:
-            # Orientation metrics
             metrics['mae_orientation'] = np.mean(self.errors['orientation'])
             metrics['rmse_orientation'] = np.sqrt(np.mean([e**2 for e in self.errors['orientation']]))
             metrics['max_orientation_error'] = np.max(self.errors['orientation'])
         
-        # Trajectory metrics
         if len(self.estimated_poses) > 1:
             metrics['total_distance'] = self.compute_trajectory_length()
             metrics['drift_rate'] = self.compute_drift_rate()
         
-        # Performance metrics
         if len(self.stats['processing_time']) > 0:
             metrics['avg_processing_time'] = np.mean(self.stats['processing_time'])
             metrics['max_processing_time'] = np.max(self.stats['processing_time'])
             metrics['min_processing_time'] = np.min(self.stats['processing_time'])
         
-        # Success rate
         if self.stats['total_frames'] > 0:
             metrics['success_rate'] = self.stats['successful_frames'] / self.stats['total_frames']
         
         return metrics
     
     def compute_trajectory_length(self) -> float:
-        """Compute total trajectory length"""
         if len(self.estimated_poses) < 2:
             return 0.0
         
@@ -114,18 +89,12 @@ class SLAMEvaluator:
         return total_length
     
     def compute_drift_rate(self) -> float:
-        """Compute drift rate (m/s)"""
         if len(self.estimated_poses) < 2 or len(self.timestamps) < 2:
             return 0.0
-        
-        # Compute drift from start to end
+
         start_pos = self.estimated_poses[0][:2]
         end_pos = self.estimated_poses[-1][:2]
-        
-        # If loop closure, end should be close to start
         drift = np.linalg.norm(end_pos - start_pos)
-        
-        # Time elapsed
         time_elapsed = self.timestamps[-1] - self.timestamps[0]
         
         if time_elapsed > 0:
@@ -134,21 +103,17 @@ class SLAMEvaluator:
         return 0.0
     
     def record_processing_time(self, time_ms: float):
-        """Record processing time"""
         self.stats['processing_time'].append(time_ms)
     
     def record_success(self, success: bool):
-        """Record frame processing success"""
         self.stats['total_frames'] += 1
         if success:
             self.stats['successful_frames'] += 1
     
     def record_loop_closure(self):
-        """Record loop closure"""
         self.stats['loop_closures'] += 1
     
     def get_report(self) -> str:
-        """Generate evaluation report"""
         metrics = self.compute_metrics()
         
         report = "=== SLAM Evaluation Report ===\n\n"
@@ -183,24 +148,19 @@ class SLAMEvaluator:
         return report
 
 
-class NavigationEvaluator:
-    """Evaluator cho navigation system"""
-    
+class NavigationEvaluator:  
     def __init__(self):
         self.waypoint_errors = []
         self.path_following_errors = []
         self.mission_times = []
         
     def record_waypoint_error(self, error: float):
-        """Record waypoint reaching error"""
         self.waypoint_errors.append(error)
     
     def record_path_following_error(self, error: float):
-        """Record path following error"""
         self.path_following_errors.append(error)
     
     def compute_metrics(self) -> Dict:
-        """Compute navigation metrics"""
         metrics = {}
         
         if self.waypoint_errors:

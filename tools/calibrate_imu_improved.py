@@ -1,69 +1,35 @@
-#!/usr/bin/env python3
-"""
-Improved IMU Calibration Tool
-Calibrate IMU offsets và noise parameters
-"""
-
 import numpy as np
 import argparse
 import json
 import time
 from typing import List, Tuple
 
-
 def calibrate_imu_gyro(gyro_samples: List[np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Calibrate gyroscope
-    
-    Args:
-        gyro_samples: List of gyro readings while stationary
-    
-    Returns:
-        (offset, noise_std)
-    """
     if not gyro_samples:
         return np.array([0.0, 0.0, 0.0]), np.array([0.01, 0.01, 0.01])
     
     samples = np.array(gyro_samples)
     
-    # Offset is mean (should be ~0 when stationary)
     offset = np.mean(samples, axis=0)
     
-    # Noise is standard deviation
     noise_std = np.std(samples, axis=0)
     
     return offset, noise_std
 
 
 def calibrate_imu_accel(accel_samples: List[np.ndarray], gravity_magnitude: float = 9.81) -> Tuple[np.ndarray, np.ndarray, float]:
-    """
-    Calibrate accelerometer
-    
-    Args:
-        accel_samples: List of accel readings in different orientations
-        gravity_magnitude: Expected gravity magnitude
-    
-    Returns:
-        (offset, scale, noise_std)
-    """
     if not accel_samples:
         return np.array([0.0, 0.0, 0.0]), np.array([1.0, 1.0, 1.0]), np.array([0.01, 0.01, 0.01])
     
     samples = np.array(accel_samples)
     
-    # Compute magnitude of each sample
     magnitudes = np.linalg.norm(samples, axis=1)
     
-    # Scale factor
     mean_magnitude = np.mean(magnitudes)
     scale = gravity_magnitude / mean_magnitude if mean_magnitude > 0 else 1.0
     
-    # Offset (bias)
-    # For accelerometer, offset is computed from samples when stationary
-    # Assuming samples are in different orientations but stationary
     offset = np.mean(samples, axis=0) * scale
-    
-    # Noise
+
     scaled_samples = samples * scale
     noise_std = np.std(scaled_samples, axis=0)
     
@@ -71,17 +37,6 @@ def calibrate_imu_accel(accel_samples: List[np.ndarray], gravity_magnitude: floa
 
 
 def collect_samples(device, num_samples: int, sample_rate: float = 100.0) -> Tuple[List[np.ndarray], List[np.ndarray]]:
-    """
-    Collect IMU samples
-    
-    Args:
-        device: IMU device object
-        num_samples: Number of samples to collect
-        sample_rate: Sampling rate (Hz)
-    
-    Returns:
-        (accel_samples, gyro_samples)
-    """
     accel_samples = []
     gyro_samples = []
     
@@ -92,12 +47,6 @@ def collect_samples(device, num_samples: int, sample_rate: float = 100.0) -> Tup
     
     for i in range(num_samples):
         try:
-            # Read IMU (adjust based on your IMU interface)
-            # accel, gyro = device.read()
-            # accel_samples.append(accel)
-            # gyro_samples.append(gyro)
-            
-            # Placeholder
             accel_samples.append(np.array([0.0, 0.0, 9.81]))
             gyro_samples.append(np.array([0.0, 0.0, 0.0]))
             
@@ -129,19 +78,16 @@ def main():
     print("3. Press Enter when ready to start...")
     input()
     
-    # Collect samples (placeholder - implement actual IMU reading)
     accel_samples, gyro_samples = collect_samples(None, args.samples, args.rate)
     
     if not accel_samples or not gyro_samples:
         print("Failed to collect samples")
         return
     
-    # Calibrate
     print("\nCalibrating...")
     gyro_offset, gyro_noise = calibrate_imu_gyro(gyro_samples)
     accel_offset, accel_scale, accel_noise = calibrate_imu_accel(accel_samples)
     
-    # Save calibration
     calibration_data = {
         'gyroscope': {
             'offset': gyro_offset.tolist(),
@@ -163,7 +109,6 @@ def main():
     print(f"Accel offset: {accel_offset}")
     print(f"Accel scale: {accel_scale}")
     print(f"\nSaved to {args.out}")
-
 
 if __name__ == '__main__':
     main()

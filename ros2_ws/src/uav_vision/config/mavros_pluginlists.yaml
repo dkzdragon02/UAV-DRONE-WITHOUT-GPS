@@ -1,0 +1,12 @@
+/**:
+  ros__parameters:
+    plugin_denylist:
+      - mission
+      - geofence
+      - rallypoint
+      - image_pub
+      - vibration
+      - distance_sensor
+      - rangefinder
+      - wheel_odometry
+      - gps_input

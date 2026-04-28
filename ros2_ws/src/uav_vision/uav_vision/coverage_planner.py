@@ -1,35 +1,14 @@
-#!/usr/bin/env python3
-"""
-Coverage Planning cho Mapping Missions
-Tạo path để cover một khu vực (lawnmower, spiral, etc.)
-"""
-
 import numpy as np
 from typing import List, Tuple
 import math
 
-
 class CoveragePlanner:
-    """Coverage planner cho mapping missions"""
-    
     def __init__(self):
         self.coverage_patterns = ['lawnmower', 'spiral', 'zigzag']
     
     def plan_lawnmower(self, bounds: Tuple[float, float, float, float],
                       altitude: float, spacing: float) -> List[List[float]]:
-        """
-        Plan lawnmower pattern
-        
-        Args:
-            bounds: (x_min, y_min, x_max, y_max)
-            altitude: Flight altitude
-            spacing: Spacing between passes (meters)
-        
-        Returns:
-            List of waypoints [x, y, z]
-        """
         x_min, y_min, x_max, y_max = bounds
-        
         waypoints = []
         y = y_min
         direction = 1  # 1 for right, -1 for left
@@ -50,18 +29,6 @@ class CoveragePlanner:
     def plan_spiral(self, center: Tuple[float, float], 
                    max_radius: float, altitude: float,
                    spacing: float) -> List[List[float]]:
-        """
-        Plan spiral pattern
-        
-        Args:
-            center: (x, y) center point
-            max_radius: Maximum radius
-            altitude: Flight altitude
-            spacing: Spacing between turns
-        
-        Returns:
-            List of waypoints
-        """
         waypoints = []
         cx, cy = center
         
@@ -72,8 +39,6 @@ class CoveragePlanner:
             x = cx + radius * math.cos(angle)
             y = cy + radius * math.sin(angle)
             waypoints.append([x, y, altitude])
-            
-            # Increase angle and radius
             angle += spacing / radius
             if angle >= 2 * math.pi:
                 angle = 0.0
@@ -84,72 +49,34 @@ class CoveragePlanner:
     def plan_zigzag(self, start: Tuple[float, float],
                    end: Tuple[float, float],
                    altitude: float, spacing: float) -> List[List[float]]:
-        """
-        Plan zigzag pattern
-        
-        Args:
-            start: (x, y) start point
-            end: (x, y) end point
-            altitude: Flight altitude
-            spacing: Spacing between zigs
-        
-        Returns:
-            List of waypoints
-        """
         waypoints = []
         sx, sy = start
         ex, ey = end
-        
-        # Direction vector
         dx = ex - sx
         dy = ey - sy
         length = math.sqrt(dx*dx + dy*dy)
         
         if length == 0:
             return [[sx, sy, altitude]]
-        
-        # Normalize
         dx /= length
         dy /= length
-        
-        # Perpendicular vector
         perp_x = -dy
         perp_y = dx
-        
         num_passes = int(length / spacing) + 1
         
         for i in range(num_passes + 1):
             t = i / num_passes if num_passes > 0 else 1.0
-            
-            # Base position
             x = sx + t * (ex - sx)
             y = sy + t * (ey - sy)
-            
-            # Zigzag offset
-            offset = spacing * (i % 2) * 0.5  # Alternate sides
+            offset = spacing * (i % 2) * 0.5                            # Alternate sides
             x += perp_x * offset
-            y += perp_y * offset
-            
+            y += perp_y * offset     
             waypoints.append([x, y, altitude])
-        
         return waypoints
     
     def plan_rectangle(self, center: Tuple[float, float],
                       width: float, height: float,
                       altitude: float, spacing: float) -> List[List[float]]:
-        """
-        Plan rectangle coverage
-        
-        Args:
-            center: (x, y) center point
-            width: Rectangle width
-            height: Rectangle height
-            altitude: Flight altitude
-            spacing: Spacing between passes
-        
-        Returns:
-            List of waypoints
-        """
         cx, cy = center
         x_min = cx - width / 2
         x_max = cx + width / 2
@@ -161,17 +88,5 @@ class CoveragePlanner:
     def plan_circle(self, center: Tuple[float, float],
                    radius: float, altitude: float,
                    spacing: float) -> List[List[float]]:
-        """
-        Plan circular coverage
-        
-        Args:
-            center: (x, y) center point
-            radius: Circle radius
-            altitude: Flight altitude
-            spacing: Spacing between turns
-        
-        Returns:
-            List of waypoints
-        """
         return self.plan_spiral(center, radius, altitude, spacing)
 

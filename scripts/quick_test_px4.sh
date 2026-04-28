@@ -6,7 +6,7 @@ echo ""
 
 # Source ROS2
 source /opt/ros/humble/setup.bash
-cd ~/UAV-no-GPS/ros2_ws
+cd ~/VUAV-DRONE-WITHOUT-GPS/ros2_ws
 source install/setup.bash
 
 echo "Kiểm tra các thành phần:"
@@ -34,7 +34,7 @@ else
 fi
 
 # 4. Kiểm tra ROS2 workspace
-if [ -d "$HOME/UAV-no-GPS/ros2_ws/install" ]; then
+if [ -d "$HOME/VUAV-DRONE-WITHOUT-GPS/ros2_ws/install" ]; then
     echo "✅ ROS2 workspace built"
 else
     echo "⚠️  ROS2 workspace not built (cần: cd ros2_ws && colcon build)"
@@ -45,7 +45,7 @@ echo "=== HƯỚNG DẪN CHẠY (ROS2-ONLY) ==="
 echo ""
 echo "1. Terminal 1 - PX4 SITL:"
 echo "   cd ~/PX4-Autopilot"
-echo "   ~/UAV-no-GPS/scripts/start_px4_sitl.sh empty iris"
+echo "   ~/VUAV-DRONE-WITHOUT-GPS/scripts/start_px4_sitl.sh empty iris"
 echo ""
 echo "2. Terminal 2 - Vision System (ROS2-only):"
 echo "   cd ~/UAV-no-GPS/ros2_ws"

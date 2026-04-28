@@ -1,0 +1,53 @@
+{
+  "mission_name": "Recon Alpha",
+  "description": "Reconnaissance mission — GPS waypoints converted to NED at runtime",
+  "home_position": {
+    "latitude": 10.762622,
+    "longitude": 106.660172,
+    "altitude": 0.0
+  },
+  "flight_altitude": 5.0,
+  "waypoints": [
+    {
+      "latitude": 10.762622,
+      "longitude": 106.660172,
+      "altitude": 5.0,
+      "action": "takeoff",
+      "description": "Home — takeoff point"
+    },
+    {
+      "latitude": 10.762722,
+      "longitude": 106.660272,
+      "altitude": 5.0,
+      "action": "hover",
+      "hover_time": 3.0,
+      "description": "Observation point 1 — hover 3s"
+    },
+    {
+      "latitude": 10.762822,
+      "longitude": 106.660172,
+      "altitude": 5.0,
+      "action": "photo",
+      "description": "Photo capture point"
+    },
+    {
+      "latitude": 10.762822,
+      "longitude": 106.660072,
+      "altitude": 5.0,
+      "action": "flyover",
+      "description": "Flyover waypoint"
+    },
+    {
+      "latitude": 10.762622,
+      "longitude": 106.660172,
+      "altitude": 5.0,
+      "action": "land",
+      "description": "Return to home — land"
+    }
+  ],
+  "safety": {
+    "max_speed": 1.0,
+    "geofence_radius": 50.0,
+    "rtl_on_mission_complete": true
+  }
+}

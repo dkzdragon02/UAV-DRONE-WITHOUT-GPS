@@ -3,10 +3,8 @@ from launch_ros.actions import Node
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 
-
 def generate_launch_description():
     return LaunchDescription([
-        # Launch arguments
         DeclareLaunchArgument(
             'use_visual_odometry',
             default_value='true',
@@ -38,7 +36,6 @@ def generate_launch_description():
             description='Camera FPS'
         ),
         
-        # Vision Node
         Node(
             package='uav_vision',
             executable='vision_node',
@@ -54,7 +51,6 @@ def generate_launch_description():
             output='screen'
         ),
         
-        # Optical Flow Node
         Node(
             package='uav_vision',
             executable='optical_flow_node',
@@ -62,15 +58,6 @@ def generate_launch_description():
             output='screen'
         ),
         
-        # Object Detection Node (optional)
-        # Node(
-        #     package='uav_vision',
-        #     executable='object_detection_node',
-        #     name='object_detection_node',
-        #     output='screen'
-        # ),
-        
-        # PX4 MAVLink Bridge (ROS2-only, kết nối trực tiếp với PX4)
         Node(
             package='uav_vision',
             executable='px4_mavlink_bridge',

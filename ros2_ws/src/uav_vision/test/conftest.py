@@ -1,18 +1,11 @@
-"""
-Pytest configuration and fixtures
-"""
-
 import pytest
 import sys
 import os
 from pathlib import Path
 
-# Add source to path
 src_path = Path(__file__).parent.parent
 sys.path.insert(0, str(src_path))
 
-# ROS2 imports require ROS environment
-# These will be skipped if ROS2 is not available
 try:
     import rclpy
     ROS2_AVAILABLE = True
@@ -22,13 +15,11 @@ except ImportError:
 
 @pytest.fixture
 def ros2_available():
-    """Fixture to check if ROS2 is available"""
     return ROS2_AVAILABLE
 
 
 @pytest.fixture
 def sample_config_dict():
-    """Sample configuration dictionary for testing"""
     return {
         'processing_rate': 30.0,
         'image_topic': '/camera/image_raw',
@@ -40,7 +31,6 @@ def sample_config_dict():
 
 @pytest.fixture
 def temp_config_file(tmp_path):
-    """Create a temporary config file"""
     import yaml
     config_file = tmp_path / "test_config.yaml"
     config_data = {

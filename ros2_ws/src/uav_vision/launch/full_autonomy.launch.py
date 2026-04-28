@@ -4,20 +4,8 @@ from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
-
-def generate_launch_description():
-    """Launch file cho full autonomy system
-    
-    Bao gồm:
-    - SLAM với loop closure
-    - State Machine
-    - Path Planning
-    - PX4 Controller
-    - PX4 MAVLink Bridge
-    """
-    
+def generate_launch_description():   
     return LaunchDescription([
-        # Launch arguments
         DeclareLaunchArgument(
             'camera_topic',
             default_value='/camera/image_raw',
@@ -54,7 +42,6 @@ def generate_launch_description():
             description='PX4 MAVLink connection string'
         ),
         
-        # SLAM Node
         Node(
             package='uav_vision',
             executable='slam_node',
@@ -71,7 +58,6 @@ def generate_launch_description():
             condition=IfCondition(LaunchConfiguration('use_slam'))
         ),
         
-        # State Machine
         Node(
             package='uav_vision',
             executable='state_machine',
@@ -86,7 +72,6 @@ def generate_launch_description():
             condition=IfCondition(LaunchConfiguration('use_state_machine'))
         ),
         
-        # Path Planner
         Node(
             package='uav_vision',
             executable='path_planner',
@@ -100,7 +85,6 @@ def generate_launch_description():
             condition=IfCondition(LaunchConfiguration('use_path_planner'))
         ),
         
-        # PX4 Controller
         Node(
             package='uav_vision',
             executable='px4_controller',
@@ -114,7 +98,6 @@ def generate_launch_description():
             condition=IfCondition(LaunchConfiguration('use_px4_controller'))
         ),
         
-        # PX4 MAVLink Bridge
         Node(
             package='uav_vision',
             executable='px4_mavlink_bridge',
@@ -128,7 +111,6 @@ def generate_launch_description():
             condition=IfCondition(LaunchConfiguration('use_px4_bridge'))
         ),
         
-        # Coverage Planner
         Node(
             package='uav_vision',
             executable='coverage_planner_node',
@@ -136,7 +118,6 @@ def generate_launch_description():
             output='screen',
         ),
         
-        # Evaluation Node
         Node(
             package='uav_vision',
             executable='evaluation_node',
@@ -147,7 +128,6 @@ def generate_launch_description():
             output='screen',
         ),
         
-        # Performance Monitor
         Node(
             package='uav_vision',
             executable='performance_monitor',
@@ -158,7 +138,6 @@ def generate_launch_description():
             output='screen',
         ),
         
-        # Visualization Node
         Node(
             package='uav_vision',
             executable='visualization_node',

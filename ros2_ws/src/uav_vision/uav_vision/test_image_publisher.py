@@ -1,9 +1,3 @@
-#!/usr/bin/env python3
-"""
-Test Image Publisher - Tạo ảnh test để kiểm thử hệ thống
-Không cần camera thật, tạo ảnh synthetic với pattern di chuyển
-"""
-
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
@@ -12,54 +6,48 @@ import cv2
 import numpy as np
 import time
 
-
 class TestImagePublisher(Node):
-    """Publish test images với pattern di chuyển"""
-    
     def __init__(self):
         super().__init__('test_image_publisher')
-        
-        # Parameters
         self.declare_parameter('width', 640)
         self.declare_parameter('height', 480)
         self.declare_parameter('fps', 30.0)
-        self.declare_parameter('pattern', 'moving_circle')  # 'moving_circle', 'checkerboard', 'random'
-        
+        self.declare_parameter('pattern', 'terrain')
         self.width = self.get_parameter('width').value
         self.height = self.get_parameter('height').value
         self.fps = self.get_parameter('fps').value
         self.pattern = self.get_parameter('pattern').value
-        
         self.bridge = CvBridge()
         self.publisher = self.create_publisher(Image, '/camera/image_raw', 10)
-        
-        # Timer
+
         period = 1.0 / self.fps
         self.timer = self.create_timer(period, self.timer_callback)
-        
-        # Animation state
         self.frame_count = 0
-        self.circle_x = self.width // 2
-        self.circle_y = self.height // 2
-        self.direction_x = 1
-        self.direction_y = 1
-        self.speed = 2
-        
-        self.get_logger().info(f'Test Image Publisher started: {self.width}x{self.height} @ {self.fps}fps, pattern: {self.pattern}')
-    
+        self._rng = np.random.RandomState(42)  # Deterministic for reproducibility
+        self._terrain_bg = self._generate_terrain_background()
+        self._indoor_bg = self._generate_indoor_background()
+        self._checkerboard_bg = self._generate_checkerboard_background()
+        self._landmarks = self._generate_landmarks(count=80)
+        self._pan_x = 0.0
+        self._pan_y = 0.0
+        self._pan_vx = 0.3   # pixels/frame horizontal drift
+        self._pan_vy = 0.15  # pixels/frame vertical drift
+
+        self.get_logger().info(
+            f'Test Image Publisher started: {self.width}x{self.height} '
+            f'@ {self.fps}fps, pattern: {self.pattern}'
+        )
+
     def timer_callback(self):
-        """Tạo và publish test image"""
-        # Tạo ảnh dựa trên pattern
-        if self.pattern == 'moving_circle':
-            image = self.create_moving_circle_image()
-        elif self.pattern == 'checkerboard':
-            image = self.create_checkerboard_image()
-        elif self.pattern == 'random':
-            image = self.create_random_image()
-        else:
-            image = self.create_moving_circle_image()
-        
-        # Convert to ROS Image message
+        pattern_map = {
+            'terrain': self.create_terrain_image,
+            'moving_features': self.create_moving_features_image,
+            'indoor': self.create_indoor_image,
+            'checkerboard': self.create_checkerboard_image,
+        }
+        gen = pattern_map.get(self.pattern, self.create_terrain_image)
+        image = gen()
+
         try:
             msg = self.bridge.cv2_to_imgmsg(image, "bgr8")
             msg.header.stamp = self.get_clock().now().to_msg()
@@ -68,80 +56,218 @@ class TestImagePublisher(Node):
             self.frame_count += 1
         except Exception as e:
             self.get_logger().error(f'Error publishing image: {e}')
-    
-    def create_moving_circle_image(self):
-        """Tạo ảnh với vòng tròn di chuyển"""
-        image = np.zeros((self.height, self.width, 3), dtype=np.uint8)
-        
-        # Background gradient
-        for y in range(self.height):
-            intensity = int(50 + (y / self.height) * 50)
-            image[y, :] = [intensity, intensity, intensity]
-        
-        # Cập nhật vị trí vòng tròn
-        self.circle_x += self.direction_x * self.speed
-        self.circle_y += self.direction_y * self.speed
-        
-        # Đổi hướng khi chạm biên
-        if self.circle_x < 50 or self.circle_x > self.width - 50:
-            self.direction_x *= -1
-        if self.circle_y < 50 or self.circle_y > self.height - 50:
-            self.direction_y *= -1
-        
-        # Vẽ vòng tròn
-        cv2.circle(image, (int(self.circle_x), int(self.circle_y)), 30, (0, 255, 0), -1)
-        cv2.circle(image, (int(self.circle_x), int(self.circle_y)), 30, (255, 255, 255), 2)
-        
-        # Vẽ một số features để VO có thể track
-        for i in range(10):
-            x = int(self.circle_x + 100 * np.cos(i * np.pi / 5))
-            y = int(self.circle_y + 100 * np.sin(i * np.pi / 5))
-            if 0 < x < self.width and 0 < y < self.height:
-                cv2.circle(image, (x, y), 5, (255, 0, 0), -1)
-        
-        # Thêm text
-        cv2.putText(image, f'Frame: {self.frame_count}', (10, 30), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-        cv2.putText(image, f'Pos: ({int(self.circle_x)}, {int(self.circle_y)})', (10, 70), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-        
-        return image
-    
-    def create_checkerboard_image(self):
-        """Tạo ảnh checkerboard với pattern di chuyển"""
-        image = np.zeros((self.height, self.width, 3), dtype=np.uint8)
-        
-        # Checkerboard pattern
-        square_size = 50
-        offset_x = int(self.frame_count * 0.5) % square_size
-        offset_y = int(self.frame_count * 0.3) % square_size
-        
-        for y in range(0, self.height, square_size):
-            for x in range(0, self.width, square_size):
-                if ((x + offset_x) // square_size + (y + offset_y) // square_size) % 2 == 0:
-                    cv2.rectangle(image, (x, y), (x + square_size, y + square_size), (255, 255, 255), -1)
-                else:
-                    cv2.rectangle(image, (x, y), (x + square_size, y + square_size), (0, 0, 0), -1)
-        
-        return image
-    
-    def create_random_image(self):
-        """Tạo ảnh với features ngẫu nhiên"""
-        image = np.random.randint(0, 255, (self.height, self.width, 3), dtype=np.uint8)
-        
-        # Thêm một số features cố định để track
-        for i in range(20):
-            x = np.random.randint(0, self.width)
-            y = np.random.randint(0, self.height)
-            cv2.circle(image, (x, y), 5, (255, 255, 255), -1)
-        
-        return image
 
+    def _generate_terrain_background(self):
+        bw, bh = self.width * 3, self.height * 3
+        bg = np.zeros((bh, bw, 3), dtype=np.uint8)
+
+        for _ in range(200):
+            cx = self._rng.randint(0, bw)
+            cy = self._rng.randint(0, bh)
+            r = self._rng.randint(20, 120)
+            color = tuple(int(c) for c in self._rng.randint(30, 200, size=3))
+            cv2.circle(bg, (cx, cy), r, color, -1)
+
+        bg = cv2.GaussianBlur(bg, (31, 31), 0)
+
+        for _ in range(300):
+            cx = self._rng.randint(10, bw - 10)
+            cy = self._rng.randint(10, bh - 10)
+            size = self._rng.randint(3, 12)
+            bright = tuple(int(c) for c in self._rng.randint(150, 255, size=3))
+            shape_type = self._rng.randint(0, 3)
+            if shape_type == 0:
+                cv2.circle(bg, (cx, cy), size, bright, -1)
+            elif shape_type == 1:
+                pts = np.array([
+                    [cx, cy - size],
+                    [cx - size, cy + size],
+                    [cx + size, cy + size]
+                ])
+                cv2.fillPoly(bg, [pts], bright)
+            else:
+                cv2.rectangle(bg, (cx - size, cy - size),
+                              (cx + size, cy + size), bright, -1)
+
+        return bg
+
+    def _generate_indoor_background(self):
+        bw, bh = self.width * 3, self.height * 3
+        bg = np.full((bh, bw, 3), 180, dtype=np.uint8)  # Light gray floor
+
+        for _ in range(40):
+            x = self._rng.randint(0, bw)
+            y = self._rng.randint(0, bh)
+            dx = self._rng.randint(-200, 200)
+            dy = self._rng.randint(-200, 200)
+            color = tuple(int(c) for c in self._rng.randint(60, 140, size=3))
+            cv2.line(bg, (x, y), (x + dx, y + dy), color, self._rng.randint(2, 6))
+
+        for _ in range(50):
+            x = self._rng.randint(0, bw - 80)
+            y = self._rng.randint(0, bh - 80)
+            w = self._rng.randint(20, 80)
+            h = self._rng.randint(20, 80)
+            color = tuple(int(c) for c in self._rng.randint(40, 220, size=3))
+            cv2.rectangle(bg, (x, y), (x + w, y + h), color, -1)
+            cv2.rectangle(bg, (x, y), (x + w, y + h), (0, 0, 0), 1)
+
+        for _ in range(100):
+            cx = self._rng.randint(5, bw - 5)
+            cy = self._rng.randint(5, bh - 5)
+            cv2.drawMarker(bg, (cx, cy), (0, 0, 0), cv2.MARKER_CROSS, 8, 1)
+
+        return bg
+
+    def _generate_landmarks(self, count=80):
+        landmarks = []
+        for _ in range(count):
+            x = self._rng.randint(20, self.width * 3 - 20)
+            y = self._rng.randint(20, self.height * 3 - 20)
+            size = self._rng.randint(4, 15)
+            color = tuple(int(c) for c in self._rng.randint(100, 255, size=3))
+            shape = self._rng.randint(0, 3)
+            landmarks.append((x, y, size, color, shape))
+        return landmarks
+
+    def create_terrain_image(self):
+        bh, bw = self._terrain_bg.shape[:2]
+        max_x = bw - self.width
+        max_y = bh - self.height
+
+        t = self.frame_count
+        self._pan_x = (max_x / 2) + (max_x / 3) * np.sin(t * 0.002)
+        self._pan_y = (max_y / 2) + (max_y / 3) * np.cos(t * 0.0015)
+
+        sx = int(np.clip(self._pan_x, 0, max_x))
+        sy = int(np.clip(self._pan_y, 0, max_y))
+
+        crop = self._terrain_bg[sy:sy + self.height, sx:sx + self.width].copy()
+        cv2.putText(crop, f'F:{self.frame_count}', (8, 22),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1,
+                    cv2.LINE_AA)
+
+        return crop
+
+    def create_indoor_image(self):
+        bh, bw = self._indoor_bg.shape[:2]
+        max_x = bw - self.width
+        max_y = bh - self.height
+
+        t = self.frame_count
+        px = (max_x / 2) + (max_x / 3) * np.sin(t * 0.003)
+        py = (max_y / 2) + (max_y / 4) * np.cos(t * 0.002)
+
+        sx = int(np.clip(px, 0, max_x))
+        sy = int(np.clip(py, 0, max_y))
+
+        return self._indoor_bg[sy:sy + self.height, sx:sx + self.width].copy()
+
+    def create_moving_features_image(self):
+        bw, bh = self.width * 3, self.height * 3
+        bg = np.zeros((bh, bw, 3), dtype=np.uint8)
+
+        for y in range(bh):
+            v = int(40 + 60 * (y / bh))
+            bg[y, :] = [v, v + 10, v + 20]
+
+        for (lx, ly, sz, col, shp) in self._landmarks:
+            if shp == 0:
+                cv2.circle(bg, (lx, ly), sz, col, -1)
+            elif shp == 1:
+                pts = np.array([
+                    [lx, ly - sz], [lx - sz, ly + sz], [lx + sz, ly + sz]
+                ])
+                cv2.fillPoly(bg, [pts], col)
+            else:
+                cv2.rectangle(bg, (lx - sz, ly - sz),
+                              (lx + sz, ly + sz), col, -1)
+
+        max_x = bw - self.width
+        max_y = bh - self.height
+        t = self.frame_count
+        px = (max_x / 2) + (max_x / 3) * np.sin(t * 0.0025)
+        py = (max_y / 2) + (max_y / 3) * np.cos(t * 0.002)
+
+        sx = int(np.clip(px, 0, max_x))
+        sy = int(np.clip(py, 0, max_y))
+
+        return bg[sy:sy + self.height, sx:sx + self.width].copy()
+
+    def _generate_checkerboard_background(self):
+        bw, bh = self.width * 3, self.height * 3
+        bg = np.zeros((bh, bw, 3), dtype=np.uint8)
+        square_size = 50
+
+        for row in range(0, bh, square_size):
+            for col in range(0, bw, square_size):
+                grid_r = row // square_size
+                grid_c = col // square_size
+                is_white = (grid_r + grid_c) % 2 == 0
+                if is_white:
+                    base = 200 + (grid_r * 7 + grid_c * 13) % 55
+                    color = (base, base - (grid_c * 3) % 30, base - (grid_r * 5) % 30)
+                else:
+                    base = 20 + (grid_r * 11 + grid_c * 7) % 40
+                    color = (base + (grid_r * 3) % 20, base, base + (grid_c * 5) % 20)
+                cv2.rectangle(bg, (col, row),
+                              (col + square_size, row + square_size), color, -1)
+
+        for row in range(0, bh, square_size):
+            for col in range(0, bw, square_size):
+                grid_r = row // square_size
+                grid_c = col // square_size
+                # Unique ID per intersection
+                uid = grid_r * 1000 + grid_c
+                marker_color = (
+                    80 + (uid * 37) % 175,
+                    80 + (uid * 53) % 175,
+                    80 + (uid * 71) % 175,
+                )
+
+                shape_type = uid % 4
+                sz = 4 + uid % 5
+                if shape_type == 0:
+                    cv2.circle(bg, (col, row), sz, marker_color, -1)
+                elif shape_type == 1:
+                    pts = np.array([
+                        [col, row - sz], [col - sz, row + sz], [col + sz, row + sz]
+                    ])
+                    cv2.fillPoly(bg, [pts], marker_color)
+                elif shape_type == 2:
+                    cv2.rectangle(bg, (col - sz, row - sz),
+                                  (col + sz, row + sz), marker_color, -1)
+                else:
+                    cv2.drawMarker(bg, (col, row), marker_color,
+                                   cv2.MARKER_DIAMOND, sz * 2, 2)
+
+        noise = self._rng.randint(0, 15, (bh, bw, 3), dtype=np.uint8)
+        bg = cv2.add(bg, noise)
+
+        return bg
+
+    def create_checkerboard_image(self):
+        bh, bw = self._checkerboard_bg.shape[:2]
+        max_x = bw - self.width
+        max_y = bh - self.height
+
+        t = self.frame_count
+        px = (max_x / 2) + (max_x / 3) * np.sin(t * 0.002)
+        py = (max_y / 2) + (max_y / 3) * np.cos(t * 0.0015)
+
+        sx = int(np.clip(px, 0, max_x))
+        sy = int(np.clip(py, 0, max_y))
+
+        crop = self._checkerboard_bg[sy:sy + self.height, sx:sx + self.width].copy()
+        cv2.putText(crop, f'F:{self.frame_count}', (8, 22),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1,
+                    cv2.LINE_AA)
+        return crop
 
 def main(args=None):
     rclpy.init(args=args)
     node = TestImagePublisher()
-    
+
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
@@ -150,7 +276,5 @@ def main(args=None):
         node.destroy_node()
         rclpy.shutdown()
 
-
 if __name__ == '__main__':
     main()
-

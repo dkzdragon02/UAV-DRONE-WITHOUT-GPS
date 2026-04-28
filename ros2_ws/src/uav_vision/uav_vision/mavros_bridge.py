@@ -1,9 +1,3 @@
-#!/usr/bin/env python3
-"""
-ROS2 Node bridge giữa Vision và MAVROS/MAVLink
-Chuyển đổi vision pose/odometry sang MAVLink messages
-"""
-
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
@@ -11,14 +5,10 @@ from geometry_msgs.msg import PoseStamped
 from mavros_msgs.srv import SetMode, CommandBool
 import numpy as np
 
-
 class MAVROSBridge(Node):
-    """Bridge giữa Vision và MAVROS"""
-    
     def __init__(self):
         super().__init__('mavros_bridge')
         
-        # Parameters
         self.declare_parameter('vision_odom_topic', '/uav/vision/odometry')
         self.declare_parameter('mavros_vision_topic', '/mavros/vision_pose/pose')
         self.declare_parameter('frame_id', 'vision_odom')
@@ -26,22 +16,18 @@ class MAVROSBridge(Node):
         vision_topic = self.get_parameter('vision_odom_topic').value
         mavros_topic = self.get_parameter('mavros_vision_topic').value
         
-        # Publishers to MAVROS
-        # In ROS2, vision pose is published as PoseStamped, not VisionPositionEstimate
         self.vision_pose_pub = self.create_publisher(
             PoseStamped,
             mavros_topic,
             10
         )
         
-        # In ROS2, MAVROS uses standard nav_msgs/Odometry for odometry
         self.vision_odom_pub = self.create_publisher(
             Odometry,
             '/mavros/odometry/out',
             10
         )
         
-        # Subscribers from Vision
         self.odom_sub = self.create_subscription(
             Odometry,
             vision_topic,
@@ -49,41 +35,29 @@ class MAVROSBridge(Node):
             10
         )
         
-        # MAVROS services
         self.set_mode_client = self.create_client(SetMode, '/mavros/set_mode')
         self.arming_client = self.create_client(CommandBool, '/mavros/cmd/arming')
-        
         self.get_logger().info('MAVROS Bridge started')
         self.get_logger().info(f'Subscribing to: {vision_topic}')
         self.get_logger().info(f'Publishing to: {mavros_topic}')
     
     def odom_callback(self, msg):
-        """Callback khi nhận odometry từ vision"""
         try:
-            # Convert to MAVROS PoseStamped (vision pose estimate)
             vision_pose = PoseStamped()
             vision_pose.header.stamp = msg.header.stamp
             vision_pose.header.frame_id = msg.header.frame_id
-            
-            # Position (NED frame)
             vision_pose.pose.position.x = msg.pose.pose.position.x
             vision_pose.pose.position.y = msg.pose.pose.position.y
             vision_pose.pose.position.z = msg.pose.pose.position.z
-            
-            # Orientation
             vision_pose.pose.orientation = msg.pose.pose.orientation
             
             self.vision_pose_pub.publish(vision_pose)
-            
-            # Also publish as MAVROS Odometry (using standard nav_msgs/Odometry)
-            # Just republish the original message
             self.vision_odom_pub.publish(msg)
             
         except Exception as e:
             self.get_logger().error(f'Error in odom callback: {e}')
     
     def set_mode(self, mode: str):
-        """Set flight mode qua MAVROS"""
         if not self.set_mode_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().warn('MAVROS set_mode service not available')
             return False
@@ -102,7 +76,6 @@ class MAVROSBridge(Node):
             return False
     
     def arm(self, arm: bool):
-        """Arm/Disarm qua MAVROS"""
         if not self.arming_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().warn('MAVROS arming service not available')
             return False
@@ -120,7 +93,6 @@ class MAVROSBridge(Node):
             self.get_logger().warn(f'Failed to {"arm" if arm else "disarm"} vehicle')
             return False
 
-
 def main(args=None):
     rclpy.init(args=args)
     node = MAVROSBridge()
@@ -132,7 +104,6 @@ def main(args=None):
     finally:
         node.destroy_node()
         rclpy.shutdown()
-
 
 if __name__ == '__main__':
     main()
